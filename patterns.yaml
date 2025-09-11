@@ -1,0 +1,91 @@
+rules:
+  # ================= Runtime Notices / Warnings =================
+
+  - id: undefined_array_key_superglobals
+    match: 'undefined array key'
+    search: |
+      (\$_(GET|POST|REQUEST|COOKIE)\[[\'"]([A-Za-z0-9_]+)[\'"]\])(?!\s*\?\?)
+    replace: '(\1 ?? null)'
+    note: 'Guard superglobal access with ?? (idempotent).'
+
+  - id: undefined_array_key_generic
+    match: 'undefined array key'
+    search: |
+      (\$[A-Za-z_][A-Za-z0-9_]*\[[\'"]([A-Za-z0-9_]+)[\'"]\])(?!\s*\?\?)
+    replace: '(\1 ?? null)'
+    note: 'Guard any $array["key"] read with ?? (idempotent).'
+
+  - id: undefined_variable
+    match: 'undefined variable'
+    search: |
+      (\$[A-Za-z_][A-Za-z0-9_]*)
+    replace: '(isset(\1) ? \1 : null)'
+    note: 'Wrap bare variable reads with isset guard.'
+
+  - id: session_save_path_guard
+    match: 'session save path cannot be changed when a session is active'
+    search: |
+      session_save_path\((.*?)\)\s*;
+    replace: 'if (session_status() !== PHP_SESSION_ACTIVE) { session_save_path(\1); }'
+    note: 'Only set session_save_path when no active session.'
+
+  # ================ Deprecated / Removed APIs ===================
+
+  - id: ereg_deprecated
+    match: 'ereg'
+    search: |
+      ereg\(([^,]+),\s*([^)]+)\)
+    replace: 'preg_match(\1, \2)'
+    note: 'Replace ereg() with preg_match(); check delimiters manually.'
+
+  - id: split_deprecated
+    match: 'split'
+    search: |
+      split\(([^,]+),\s*([^)]+)\)
+    replace: 'explode(\1, \2)'
+    note: 'Replace split() with explode().'
+
+  - id: each_deprecated
+    match: 'each('
+    search: |
+      each\(([^)]*)\)
+    replace: '/* each() deprecated */ foreach(\1 as $k => $v)'
+    note: 'Approximate replacement; verify logic.'
+
+  - id: create_function_deprecated
+    match: 'create_function'
+    search: |
+      create_function\(([^,]+),\s*([^)]+)\)
+    replace: 'function () { return eval(\2); }'
+    note: 'Replace create_function() with anonymous function (review security).'
+
+  - id: mysql_removed
+    match: 'mysql_'
+    search: |
+      mysql_([a-z_]+)\(
+    replace: 'mysqli_\1('
+    note: 'Mechanical swap to mysqli_*; adjust connection/params as needed.'
+
+  - id: magic_quotes_removed
+    match: 'get_magic_quotes_gpc'
+    search: |
+      get_magic_quotes_gpc\(\)
+    replace: 'false'
+    note: 'Remove legacy magic quotes usage.'
+
+  # ================ PHP 8.2 Dynamic Properties ==================
+
+  - id: dynamic_properties
+    match: 'dynamic property'
+    search: |
+      (?m)^\s*(class\s+[A-Za-z_][A-Za-z0-9_]*(?:\s+extends\s+[^{]+|\s+implements\s+[^{]+)?\s*\{)
+    replace: '#[\AllowDynamicProperties]\n\1'
+    note: 'Add #[\AllowDynamicProperties] above class.'
+
+  # =================== Fallback / Marker ========================
+
+  - id: generic_warning_notice
+    match: 'warning'
+    search: ''
+    replace: ''
+    note: 'Marker for unknown warnings (no automatic patch).'
