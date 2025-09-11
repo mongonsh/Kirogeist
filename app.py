@@ -1,7 +1,6 @@
 import os, re, io, uuid, time, json, hashlib, threading, warnings, datetime as dt
 from typing import List, Dict, Any
 from urllib.parse import urljoin, urlsplit, urldefrag, parse_qsl, urlencode, urlunsplit
-from openai import OpenAI
 
 warnings.filterwarnings("ignore")
 
@@ -18,8 +17,8 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
 
-# --- our fixer (rules + optional AI) ---
-from fixer import fix_files_for_error_html
+# our fixer
+from fixer import extract_php_targets, fix_selected
 
 # ------------------------ App setup ------------------------
 app = Flask(__name__)
@@ -44,46 +43,30 @@ STRONG_ERROR_PATTERNS = [
     r"fatal\s+error", r"sqlstate", r"database\s+error",
     r"cannot\s+(get|post)\s+/", r"typeerror", r"referenceerror", r"syntaxerror",
     r"undefined\s+(index|variable|offset|array\s+key)", r"parse\s+error",
-    # Japanese
-    r"ページが見つかりません", r"指定されたページは見つかりません",
-    r"お探しのページは見つかりませんでした", r"エラーが発生", r"メンテナンス中", r"アクセス(が)?拒否",
 ]
-WEAK_ERROR_PATTERNS = [r"\bwarning\b", r"\bnotice\b", r"whoops", r"oops"]
+WEAK_ERROR_PATTERNS = [r"\bwarning\b", r"\bnotice\b", r"whoops",  r"deprecated"]
 ERROR_RE_STRONG = re.compile("|".join(STRONG_ERROR_PATTERNS), re.I | re.S)
 ERROR_RE_WEAK   = re.compile("|".join(WEAK_ERROR_PATTERNS), re.I | re.S)
 
-# ai section
-
-# Read API key from env
-client = OpenAI(api_key='')
-
-# default model
-DEFAULT_MODEL = os.environ.get("AI_MODEL", "gpt-4o-mini")
-
-def chat(messages, model: str = None, temperature: float = 0.2, max_tokens: int = 2048) -> str:
-    m = model or DEFAULT_MODEL
-    resp = client.chat.completions.create(
-        model=m,
-        messages=messages,
-        temperature=temperature,
-        max_tokens=max_tokens,
-    )
-    return resp.choices[0].message.content.strip()
-
-def ai_health(model: str = None) -> dict:
-    """Return {"ok", "model", "latency_ms", "error"}"""
-    m = model or DEFAULT_MODEL
+# ------------------------ AI health (optional) ------------------------
+def ai_health() -> dict:
+    model = os.environ.get("AI_MODEL", "gpt-4o-mini")
     t0 = time.time()
+    key = os.environ.get("OPENAI_API_KEY")
+    if not key:
+        return {"ok": False, "model": model, "latency_ms": int((time.time()-t0)*1000), "error": "NoKey"}
     try:
+        from openai import OpenAI
+        client = OpenAI()
         client.chat.completions.create(
-            model=m,
+            model=model,
             messages=[{"role":"system","content":"healthcheck"},{"role":"user","content":"ping"}],
             temperature=0.0,
             max_tokens=1,
         )
-        return {"ok": True, "model": m, "latency_ms": int((time.time()-t0)*1000), "error": None}
+        return {"ok": True, "model": model, "latency_ms": int((time.time()-t0)*1000), "error": None}
     except Exception as e:
-        return {"ok": False, "model": m, "latency_ms": int((time.time()-t0)*1000), "error": f"{type(e).__name__}: {e}"}
+        return {"ok": False, "model": model, "latency_ms": int((time.time()-t0)*1000), "error": f"{type(e).__name__}: {e}"}
 
 # ------------------------ Helpers ------------------------
 def now_str():
@@ -137,50 +120,67 @@ def fullpage_screenshot(driver, out_path: str):
     except Exception:
         driver.save_screenshot(out_path)
 
+# -------- Docker/host path remapping --------
+def _load_path_maps():
+    try:
+        maps = json.loads(os.environ.get("PATH_MAPS", "[]"))
+    except Exception:
+        maps = []
+    if not maps:
+        maps = [{"from": "/home/www-virtual/kangoiryo.jp",
+                 "to": r"D:\XAMPP\htdocs\kangoiryo.jp\branches\mungunshagai"}]
+    maps = [m for m in maps if isinstance(m, dict) and m.get("from") and m.get("to")]
+    maps.sort(key=lambda m: len(str(m["from"])), reverse=True)
+    return maps
+
+_PATH_MAPS = _load_path_maps()
+
+def remap_host_path(path_in: str) -> str:
+    if not path_in:
+        return path_in
+    u = str(path_in).replace("\\", "/")
+    for m in _PATH_MAPS:
+        src = str(m["from"]).rstrip("/").replace("\\", "/")
+        if u.startswith(src):
+            tail = u[len(src):]
+            dst = str(m["to"]).rstrip("\\/")
+            remapped = dst + tail.replace("/", os.sep)
+            return os.path.normpath(remapped)
+    return os.path.normpath(path_in)
+
 # ------------------------ Japanese-grid writer ------------------------
 def write_with_images_fit(
     df: pd.DataFrame,
     out_path: str,
     image_col: str = "screenshot_path",
     display_col_name: str = "スクリーンショット",
-    col_width_chars: float = 0.0  # kept for API compatibility (unused here)
+    col_width_chars: float = 0.0
 ):
-    """
-    Japanese grid look:
-      - tiny background grid
-      - merge only the table area horizontally
-      - row height = max(text height, scaled screenshot height)
-      - 「確認する内容」 is populated from df['check_text'] (or CHECK_TEXT)
-      - screenshots preserved
-    """
-    import xlsxwriter, math, os
+    import xlsxwriter, math
     from typing import Any
-    from PIL import Image
 
-    # ----- TABLE SCHEMA (merged horizontal blocks, widths in micro-grid columns) -----
     SCHEMA = [
         ("番号",           "row_no",       4),
         ("テスト確認項目",  "title",       36),
         ("枝番",           "edaban",       5),
         ("実施方法",       "url",         28),
-        ("確認する内容",    "check_text",  48),  # ← use check_text instead of note
+        ("確認する内容",    "check_text",  48),
         ("確認者",         "tester",       8),
         ("確認日",         "tested_date", 16),
-        ("PC",            "status",       6),
+        ("PC",             "status",       6),
         (display_col_name, image_col,     45),
     ]
 
     HEADER_ROW   = 20
     LEFT_MARGIN  = 1
-    GRID_COL_W   = 2.2   # width of each micro column
-    BASE_LINE_PX = 18    # approx height per wrapped line
+    GRID_COL_W   = 2.2
+    BASE_LINE_PX = 18
     CHAR_TO_PX   = 7.0
 
     with pd.ExcelWriter(out_path, engine="xlsxwriter") as writer:
         wb = writer.book
         ws = wb.add_worksheet("テスト項目")
 
-        # formats
         header_fmt = wb.add_format({
             "bold": True, "bg_color": "#C6EFCE",
             "border": 1, "align": "center", "valign": "vcenter"
@@ -189,7 +189,6 @@ def write_with_images_fit(
             "border": 1, "valign": "top", "text_wrap": True
         })
 
-        # background grid (outside table is tiny cells)
         total_grid_cols = LEFT_MARGIN + sum(w for _, _, w in SCHEMA) + 20
         bg_rows = HEADER_ROW + (len(df) * 4) + 80
         for c in range(total_grid_cols):
@@ -197,7 +196,6 @@ def write_with_images_fit(
         for r in range(bg_rows):
             ws.set_row(r, 15)
 
-        # header (merge only table area)
         col_ptr = LEFT_MARGIN
         col_positions = []
         for label, _, width in SCHEMA:
@@ -205,15 +203,12 @@ def write_with_images_fit(
             col_positions.append((col_ptr, col_ptr + width - 1, width))
             col_ptr += width
 
-        # helper: estimate text height
         def text_height_px(text: Any, width_cols: int) -> int:
             s = "" if text is None else str(text)
-            # rough chars that fit per line for this merged width
             max_chars = max(1, int(width_cols * GRID_COL_W))
             lines = 1 if s == "" else sum(max(1, math.ceil(len(line) / max_chars)) for line in s.splitlines() or [""])
             return max(BASE_LINE_PX, lines * BASE_LINE_PX + 8)
 
-        # write records
         row_idx = HEADER_ROW + 1
         for i, rec in enumerate(df.to_dict("records"), start=1):
             mapped = {
@@ -221,7 +216,6 @@ def write_with_images_fit(
                 "title": rec.get("title", ""),
                 "edaban": "",
                 "url": rec.get("url", ""),
-                # ← this is the IMPORTANT change
                 "check_text": rec.get("check_text") or CHECK_TEXT,
                 "tester": rec.get("tester", ""),
                 "tested_date": rec.get("tested_date", ""),
@@ -229,7 +223,6 @@ def write_with_images_fit(
                 image_col: rec.get(image_col, ""),
             }
 
-            # text height (exclude row_no/edaban/status/image)
             text_heights = []
             for (label, field, width), (c0, c1, wcols) in zip(SCHEMA, col_positions):
                 if field in ("row_no", "edaban", "status", image_col):
@@ -237,7 +230,6 @@ def write_with_images_fit(
                 text_heights.append(text_height_px(mapped.get(field, ""), wcols))
             text_h = max(text_heights) if text_heights else BASE_LINE_PX
 
-            # image height
             sc_c0, sc_c1, sc_wcols = col_positions[-1]
             target_w_px = sc_wcols * GRID_COL_W * CHAR_TO_PX
             img_path = str(mapped.get(image_col) or "")
@@ -254,12 +246,10 @@ def write_with_images_fit(
             row_h_px = max(40, text_h, img_h)
             ws.set_row(row_idx, row_h_px * 0.75)
 
-            # merge and write each block
             for (label, field, width), (c0, c1, wcols) in zip(SCHEMA, col_positions):
                 ws.merge_range(row_idx, c0, row_idx, c1,
                                "" if field == image_col else mapped.get(field, ""), cell_fmt)
 
-            # then place the image on top of the merged screenshot block
             if img_path and os.path.exists(img_path):
                 try:
                     with Image.open(img_path) as im:
@@ -272,9 +262,8 @@ def write_with_images_fit(
 
             row_idx += 1
 
-
 # ------------------------ Selenium bits ------------------------
-def make_driver(headless: bool = True):
+def make_driver(headless: bool = False):
     opts = Options()
     opts.add_argument("--no-sandbox")
     opts.add_argument("--disable-dev-shm-usage")
@@ -345,10 +334,16 @@ def run_test_job(
         JOBS[job_id].update({
             "status": "running", "progress": 0, "total": len(endpoints),
             "report_path": None, "summary": {"passed": 0, "failed": 0}, "errors": {},
-            "fixes": []
+            "errors_by_file": {},
+            "fixes": [],
+            "project_root": project_root,
+            "needs_confirmation": False,
+            "targets": {},
         })
 
     driver = None
+    aggregated_context_snippets = []
+
     try:
         driver = make_driver(headless=True)
         wait = WebDriverWait(driver, 20)
@@ -357,7 +352,6 @@ def run_test_job(
         sess.verify = False
         sess.headers.update({"User-Agent": "dashboard-smoke/1.0"})
 
-        # login optional (kept as-is)
         if login_url and login_id and login_pw and login_id_name and login_pw_name:
             selenium_login(driver, login_url, login_id, login_id_name, login_pw, login_pw_name, login_submit_name or "send")
             transfer_cookies_to_requests(sess, driver, base_url)
@@ -365,6 +359,7 @@ def run_test_job(
         rows = []
         passed = failed = 0
         error_buckets: Dict[str, int] = {}
+        error_files: Dict[str, int] = {}
 
         for idx, raw in enumerate(endpoints, start=1):
             url = normalize_url(raw, base_url, keep_query=True)
@@ -397,14 +392,31 @@ def run_test_job(
                 if status_code and status_code >= 400:
                     note = f"HTTP {status_code}" + ((" | " + note) if note else "")
 
-            # optional fixes
-            if auto_fix:
-                print('yes there has to be fixed.')
-                page_html = driver.page_source or body or ""
-                if project_root:
-                    fix_records = fix_files_for_error_html(project_root, page_html)
-                    with JOBS_LOCK:
-                        JOBS[job_id]["fixes"].extend(fix_records)
+            # --- Collect PHP/TPL error file:line targets ---
+            page_html = driver.page_source or body or ""
+            targets = extract_php_targets(page_html)
+            first_file_label = None
+            if targets:
+                aggregated_context_snippets.append(page_html[:4000])
+                with JOBS_LOCK:
+                    tgt = JOBS[job_id]["targets"]
+                    for php_path, line in targets:
+                        mapped = remap_host_path(php_path)
+                        abs_path = mapped if os.path.isabs(mapped) else os.path.normpath(os.path.join(project_root, mapped))
+                        rec = tgt.get(abs_path) or {"lines": set(), "count": 0}
+                        rec["lines"].add(int(line))
+                        rec["count"] += 1
+                        tgt[abs_path] = rec
+
+                        label = f"{os.path.basename(abs_path)}:{int(line)}"
+                        if first_file_label is None:
+                            first_file_label = label
+                        error_files[label] = error_files.get(label, 0) + 1
+
+                    JOBS[job_id]["needs_confirmation"] = True
+
+            if first_file_label:
+                note = f"{note} | {first_file_label}" if note else first_file_label
 
             shot_path = url_to_shot(job_id, url)
             fullpage_screenshot(driver, shot_path)
@@ -426,20 +438,15 @@ def run_test_job(
                 JOBS[job_id]["progress"] = idx
                 JOBS[job_id]["summary"] = {"passed": passed, "failed": failed}
                 JOBS[job_id]["errors"]  = error_buckets
+                JOBS[job_id]["errors_by_file"] = error_files
 
         df = pd.DataFrame(rows)
-
-        # === Japanese grid + merged content area ===
-        write_with_images_fit(
-            df,
-            report_path,
-            image_col="screenshot_path",
-            display_col_name="スクリーンショット"  # label for the screenshot header
-        )
+        write_with_images_fit(df, report_path, image_col="screenshot_path", display_col_name="スクリーンショット")
 
         with JOBS_LOCK:
             JOBS[job_id]["status"] = "done"
             JOBS[job_id]["report_path"] = report_path
+            JOBS[job_id]["context_html"] = "\n\n".join(aggregated_context_snippets[-5:])
 
     except Exception as e:
         with JOBS_LOCK:
@@ -460,7 +467,6 @@ def index():
 @app.route('/ai/health', methods=['GET'])
 def health_check():
     res = ai_health()
-    print('result:', res)
     return jsonify(res)
 
 @app.route("/run-test", methods=["POST"])
@@ -476,7 +482,6 @@ def run_test():
     login_submit_name = request.form.get("login_submit_name", "").strip()
 
     project_root = request.form.get("project_root", "").strip()
-    print('auto fix:', request.form.get("auto_fix"))
     auto_fix = request.form.get("auto_fix") == '1'
 
     endpoints_text = request.form.get("endpoints_text", "")
@@ -507,8 +512,11 @@ def run_test():
 
     job_id = uuid.uuid4().hex[:12]
     with JOBS_LOCK:
-        JOBS[job_id] = {"status": "queued", "progress": 0, "total": len(normed), "created_at": now_str()}
-    print('auto fix is:', auto_fix)
+        JOBS[job_id] = {
+            "status": "queued", "progress": 0, "total": len(normed), "created_at": now_str(),
+            "project_root": project_root, "auto_fix": auto_fix
+        }
+
     t = threading.Thread(
         target=run_test_job,
         args=(job_id, base_url, normed, test_type,
@@ -528,6 +536,19 @@ def job_status(job_id):
         return jsonify({"ok": False, "error": "job not found"}), 404
 
     resp = dict(data)
+    resp.pop("targets", None)  # remove set-heavy structure from status payload
+
+    def _safe(o):
+        if isinstance(o, set):
+            return sorted(list(o))
+        if isinstance(o, dict):
+            return {k: _safe(v) for k, v in o.items()}
+        if isinstance(o, list):
+            return [_safe(x) for x in o]
+        return o
+
+    resp = _safe(resp)
+
     if data.get("report_path"):
         resp["download_url"] = f"/job/{job_id}/download"
     return jsonify({"ok": True, "job": resp})
@@ -540,6 +561,51 @@ def job_download(job_id):
         return jsonify({"ok": False, "error": "report not ready"}), 404
     path = data["report_path"]
     return send_file(path, as_attachment=True, download_name=os.path.basename(path))
+
+@app.route("/job/<job_id>/targets", methods=["GET"])
+def job_targets(job_id):
+    with JOBS_LOCK:
+        job = JOBS.get(job_id)
+    if not job:
+        return jsonify({"ok": False, "error": "job not found"}), 404
+
+    targets = []
+    for fpath, rec in (job.get("targets") or {}).items():
+        targets.append({
+            "file": fpath,
+            "lines": sorted(list(rec["lines"])) if isinstance(rec.get("lines"), set) else (rec.get("lines") or []),
+            "count": int(rec.get("count") or 0),
+            "exists": os.path.exists(fpath)
+        })
+    return jsonify({"ok": True, "targets": targets, "needs_confirmation": bool(job.get("needs_confirmation"))})
+
+@app.route("/job/<job_id>/fix", methods=["POST"])
+def job_fix(job_id):
+    data = request.get_json(force=True, silent=True) or {}
+    items = data.get("items") or []   # [{file, lines:[...] }]
+    options = data.get("options") or {}  # e.g., {"dynprops":"off|declare|attribute"}
+    if not options.get("dynprops"):
+        options["dynprops"] = "declare"   
+
+    with JOBS_LOCK:
+        job = JOBS.get(job_id)
+    if not job:
+        return jsonify({"ok": False, "error": "job not found"}), 404
+
+    project_root = job.get("project_root") or ""
+    context_html = job.get("context_html") or ""
+    allowed = set((job.get("targets") or {}).keys())
+    filtered_items = [it for it in items if (it.get("file") in allowed)]
+
+    if not filtered_items:
+        return jsonify({"ok": False, "error": "no valid items"}), 400
+
+    results = fix_selected(project_root, filtered_items, context_html, options=options)
+
+    with JOBS_LOCK:
+        (job.get("fixes") or []).extend(results)
+        job["needs_confirmation"] = False
+    return jsonify({"ok": True, "results": results})
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", "5051"))
