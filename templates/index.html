@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>PHP8 Migration Tester</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    .chart-box { position: relative; height: 220px; }
+    .chart-box > canvas { width: 100% !important; height: 100% !important; display: block; }
+  </style>
+</head>
+<body class="bg-slate-50">
+  <div class="max-w-6xl mx-auto p-6">
+    <h1 class="text-2xl font-semibold mb-4">PHP8 Migration Tester</h1>
+
+    <div class="bg-white rounded-2xl shadow p-6">
+      <form id="testForm" class="space-y-6" onsubmit="event.preventDefault(); startRun();">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div>
+            <label class="block text-sm font-medium text-slate-700">Base URL</label>
+            <input id="base_url" type="text"
+                   class="mt-1 w-full rounded-xl border-2 border-slate-300 bg-white px-3 py-2.5 outline-none
+                          focus:border-indigo-500 focus:ring-4 focus:ring-indigo-200"
+                   placeholder="http://localhost:8186" value="http://localhost:8186"/>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700">テスト種類</label>
+            <select id="test_type"
+                    class="mt-1 w-full rounded-xl border-2 border-slate-300 bg-white px-3 py-2.5 outline-none
+                           focus:border-indigo-500 focus:ring-4 focus:ring-indigo-200">
+              <option value="smoke" selected>スモークテスト</option>
+              <option value="e2e">E2Eテスト</option>
+              <option value="integration">integrationテスト</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-slate-700">PHP Project Path</label>
+          <input id="project_root" type="text"
+                 class="mt-1 w-full rounded-xl border-2 border-slate-300 bg-white px-3 py-2.5 outline-none
+                        focus:border-indigo-500 focus:ring-4 focus:ring-indigo-200"
+                 placeholder="/home/www-virtual/licenseacademy.jp" />
+          <p class="mt-1 text-xs text-slate-500">Fixer はこのパス配下の .php/.tpl を編集します（ブランチで実行推奨）</p>
+        </div>
+
+        <details class="rounded-xl border border-slate-200 p-4">
+          <summary class="cursor-pointer text-sm text-slate-700">Optional ログイン (loginid/password/send)</summary>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-5 mt-3">
+            <div>
+              <label class="block text-sm font-medium text-slate-700">ログイン URL</label>
+              <input id="login_url" type="text"
+                     class="mt-1 w-full rounded-xl border-2 border-slate-300 bg-white px-3 py-2.5 outline-none
+                            focus:border-indigo-500 focus:ring-4 focus:ring-indigo-200"
+                     placeholder="http://localhost:8186/c-actors/admin/login">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-slate-700">ユーザー名・ID</label>
+              <input id="login_id" type="text"
+                     class="mt-1 w-full rounded-xl border-2 border-slate-300 bg-white px-3 py-2.5 outline-none
+                            focus:border-indigo-500 focus:ring-4 focus:ring-indigo-200"
+                     placeholder="super">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-slate-700">パスワード</label>
+              <input id="login_pw" type="password"
+                     class="mt-1 w-full rounded-xl border-2 border-slate-300 bg-white px-3 py-2.5 outline-none
+                            focus:border-indigo-500 focus:ring-4 focus:ring-indigo-200"
+                     placeholder="******">
+            </div>
+          </div>
+        </details>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div>
+            <label class="block text-sm font-medium text-slate-700">endpoint Excel (xlsx; sheet has <code>url</code> column)</label>
+            <input id="excel_file" name="excel_file" type="file" accept=".xlsx"
+                   class="mt-1 block w-full text-sm text-slate-700 border-2 border-dashed border-slate-300 rounded-xl p-3"/>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700">endpoint を手で追加 (1行=1URL; 相対OK)</label>
+            <textarea id="endpoints_text" rows="6"
+                      class="mt-1 w-full rounded-xl border-2 border-slate-300 bg-white px-3 py-2.5 outline-none
+                             focus:border-indigo-500 focus:ring-4 focus:ring-indigo-200"
+                      placeholder="/, /c-actors/cast/index, ..."></textarea>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-3 pt-1">
+          <button id="runBtn"
+                  class="px-4 py-2.5 rounded-xl bg-indigo-600 text-white font-medium shadow
+                         hover:bg-indigo-700 active:bg-indigo-800">
+            テストを実行する
+          </button>
+          <span id="jobInfo" class="text-sm text-slate-600 hidden">Job: <code id="jobId"></code></span>
+          <a id="downloadLink" href="#" class="ml-auto text-indigo-700 underline hidden">Excelレポートダウンロード</a>
+        </div>
+
+        <div id="progressWrap" class="mt-4 hidden">
+          <div class="flex justify-between text-sm mb-1">
+            <span>Progress</span>
+            <span id="progressLabel">0 / 0</span>
+          </div>
+          <div class="w-full bg-slate-200 rounded h-3">
+            <div id="progressBar" class="bg-indigo-600 h-3 rounded" style="width:0%"></div>
+          </div>
+        </div>
+
+        <div id="summaryWrap" class="mt-6 grid grid-cols-1 md:grid-cols-3 gap-6 hidden">
+          <div class="bg-white rounded-xl border border-slate-200 p-4">
+            <div class="text-sm text-slate-600">Totals</div>
+            <div class="text-3xl font-semibold"><span id="passedCount">0</span> passed / <span id="failedCount">0</span> failed</div>
+          </div>
+          <div class="bg-white rounded-xl border border-slate-200 p-4">
+            <div class="text-sm text-slate-600 mb-2">Pass vs Fail</div>
+            <div class="chart-box"><canvas id="pfChart"></canvas></div>
+          </div>
+          <div class="bg-white rounded-xl border border-slate-200 p-4">
+            <div class="text-sm text-slate-600 mb-2">Top Errors</div>
+            <div class="chart-box"><canvas id="errChart"></canvas></div>
+          </div>
+        </div>
+      </form>
+    </div>
+
+    <p class="mt-3 text-xs text-slate-500">* Excel には <code>url</code> 列が必要です。生成レポートにはスクリーンショットが埋め込まれます。</p>
+  </div>
+
+<script>
+let pollTimer = null, pfChart = null, errChart = null;
+
+function safeDestroyCharts(){
+  try { if (pfChart) { pfChart.destroy(); pfChart = null; } } catch(e){}
+  try { if (errChart) { errChart.destroy(); errChart = null; } } catch(e){}
+}
+
+function startRun() {
+  const fd = new FormData();
+  if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+  safeDestroyCharts();
+
+  fd.append("base_url", document.getElementById("base_url").value.trim());
+  fd.append("test_type", document.getElementById("test_type").value);
+  fd.append("project_root", document.getElementById("project_root").value.trim());
+  fd.append("login_url", document.getElementById("login_url").value.trim());
+  fd.append("login_id", document.getElementById("login_id").value.trim());
+  fd.append("login_pw", document.getElementById("login_pw").value);
+  fd.append("endpoints_text", document.getElementById("endpoints_text").value);
+
+  const f = document.getElementById("excel_file");
+  if (f.files && f.files[0]) fd.append("excel_file", f.files[0]);
+
+  document.getElementById("runBtn").disabled = true;
+  document.getElementById("downloadLink").classList.add("hidden");
+  document.getElementById("summaryWrap").classList.add("hidden");
+  document.getElementById("progressWrap").classList.remove("hidden");
+
+  fetch("/run-test", { method: "POST", body: fd })
+    .then(r => r.json())
+    .then(j => {
+      if (!j.ok) throw new Error(j.error || "failed");
+      const jobId = j.job_id;
+      document.getElementById("jobInfo").classList.remove("hidden");
+      document.getElementById("jobId").innerText = jobId;
+      poll(jobId);
+    })
+    .catch(err => {
+      alert(err.message);
+      document.getElementById("runBtn").disabled = false;
+      document.getElementById("progressWrap").classList.add("hidden");
+    });
+}
+
+function poll(jobId) {
+  if (pollTimer) clearInterval(pollTimer);
+  pollTimer = setInterval(async () => {
+    const r = await fetch(`/job/${jobId}/status`);
+    const j = await r.json();
+    if (!j.ok) return;
+
+    const job = j.job || {};
+    const total = job.total || 0;
+    const progress = job.progress || 0;
+    document.getElementById("progressLabel").innerText = `${progress} / ${total}`;
+    const pc = total ? Math.round((progress / total) * 100) : 0;
+    document.getElementById("progressBar").style.width = pc + "%";
+
+    const passed = (job.summary && job.summary.passed) || 0;
+    const failed = (job.summary && job.summary.failed) || 0;
+    document.getElementById("passedCount").innerText = passed;
+    document.getElementById("failedCount").innerText = failed;
+
+    updateCharts(passed, failed, job.errors || {});
+
+    if (job.status === "done") {
+      clearInterval(pollTimer);
+      document.getElementById("runBtn").disabled = false;
+      document.getElementById("downloadLink").classList.remove("hidden");
+      document.getElementById("downloadLink").href = job.download_url;
+      document.getElementById("summaryWrap").classList.remove("hidden");
+    }
+    if (job.status === "error") {
+      clearInterval(pollTimer);
+      document.getElementById("runBtn").disabled = false;
+      alert("Job failed: " + (job.error_msg || "unknown error"));
+    }
+  }, 1000);
+}
+
+function updateCharts(passed, failed, errors) {
+  const pfData = [passed, failed];
+  const errLabels = Object.keys(errors).slice(0, 5);
+  const errCounts = errLabels.map(k => errors[k]);
+
+  const pfCtx = document.getElementById("pfChart").getContext("2d");
+  const errCtx = document.getElementById("errChart").getContext("2d");
+
+  if (!pfChart) {
+    pfChart = new Chart(pfCtx, {
+      type: "doughnut",
+      data: { labels: ["Passed", "Failed"], datasets: [{ data: pfData }] },
+      options: { responsive: true, maintainAspectRatio: false }
+    });
+  } else {
+    pfChart.data.datasets[0].data = pfData;
+    pfChart.update();
+  }
+
+  if (!errChart) {
+    errChart = new Chart(errCtx, {
+      type: "bar",
+      data: { labels: errLabels, datasets: [{ data: errCounts }] },
+      options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, scales: { x: { beginAtZero: true } } }
+    });
+  } else {
+    errChart.data.labels = errLabels;
+    errChart.data.datasets[0].data = errCounts;
+    errChart.update();
+  }
+}
+</script>
+</body>
+</html>
