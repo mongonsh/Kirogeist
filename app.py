@@ -462,7 +462,7 @@ def run_test_job(
 # ------------------------ Routes ------------------------
 @app.route("/", methods=["GET"])
 def index():
-    return render_template("index_v1.html")
+    return render_template("index.html")
 
 @app.route('/ai/health', methods=['GET'])
 def health_check():

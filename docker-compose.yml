@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  kirogeist:
+    build: .
+    ports:
+      - "5051:5051"
+    environment:
+      - FLASK_ENV=production
+      - PORT=5051
+      - AI_MODEL=gpt-4o-mini
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - PATH_MAPS=${PATH_MAPS:-[]}
+      - PHP_FIX_PATTERNS=./patterns.yaml
+    volumes:
+      - ./uploads:/app/uploads
+      - ./reports:/app/reports
+      - ./shots:/app/shots
+      - ./logs:/app/logs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5051/ai/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./ssl:/etc/nginx/ssl
+    depends_on:
+      - kirogeist
+    restart: unless-stopped

@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="ja">
+<html lang="en">
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>PHP8 Migration Tester</title>
+  <title>Kirogeist - PHP Testing & Migration Assistant</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
@@ -11,143 +11,260 @@
     .chart-box > canvas { width: 100% !important; height: 100% !important; display: block; }
   </style>
 </head>
-<body class="bg-slate-50">
-  <div class="max-w-6xl mx-auto p-6">
-    <h1 class="text-2xl font-semibold mb-4">PHP8 Migration Tester</h1>
+<body class="bg-slate-50 text-slate-800">
+  <header class="border-b bg-white/80 backdrop-blur">
+    <div class="max-w-6xl mx-auto px-6 py-4 flex items-center gap-3">
+      <div class="w-9 h-9 rounded-xl bg-indigo-600 text-white grid place-items-center shadow-sm">K</div>
+      <h1 class="text-xl md:text-2xl font-semibold tracking-tight">Kirogeist</h1>
+      <span id="aiStatus"
+            class="ml-auto inline-flex items-center gap-2 px-2.5 py-1 rounded-full border text-xs
+                   border-slate-300 text-slate-600 bg-slate-50">
+        <span class="inline-block w-2 h-2 rounded-full bg-slate-300"></span>
+        AI: checking…
+      </span>
+    </div>
+  </header>
 
-    <div class="bg-white rounded-2xl shadow p-6">
-      <form id="testForm" class="space-y-6" onsubmit="event.preventDefault(); startRun();">
+  <main class="max-w-6xl mx-auto p-6">
+    <div class="bg-white border border-slate-200 rounded-2xl shadow-sm">
+      <div class="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
+        <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M3 7h18M3 12h18M3 17h18"/>
+        </svg>
+        <span class="font-medium">Test Configuration</span>
+      </div>
+
+      <form id="testForm" class="p-5 space-y-6" onsubmit="event.preventDefault(); startRun();">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-          <div>
+          <div class="group">
             <label class="block text-sm font-medium text-slate-700">Base URL</label>
             <input id="base_url" type="text"
-                   class="mt-1 w-full rounded-xl border-2 border-slate-300 bg-white px-3 py-2.5 outline-none
+                   class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 shadow-xs outline-none placeholder-slate-400
                           focus:border-indigo-500 focus:ring-4 focus:ring-indigo-200"
                    placeholder="http://localhost:8186" value="http://localhost:8186"/>
+            <p class="mt-1 text-xs text-slate-500">Target application root URL</p>
           </div>
-          <div>
-            <label class="block text-sm font-medium text-slate-700">テスト種類</label>
+
+          <div class="group">
+            <label class="block text-sm font-medium text-slate-700">Test Type</label>
             <select id="test_type"
-                    class="mt-1 w-full rounded-xl border-2 border-slate-300 bg-white px-3 py-2.5 outline-none
+                    class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 shadow-xs outline-none
                            focus:border-indigo-500 focus:ring-4 focus:ring-indigo-200">
-              <option value="smoke" selected>スモークテスト</option>
-              <option value="e2e">E2Eテスト</option>
-              <option value="integration">integrationテスト</option>
+              <option value="smoke" selected>Smoke Test (default)</option>
+              <option value="e2e">E2E Test</option>
+              <option value="integration">Integration Test</option>
             </select>
           </div>
         </div>
 
-        <div>
-          <label class="block text-sm font-medium text-slate-700">PHP Project Path</label>
-          <input id="project_root" type="text"
-                 class="mt-1 w-full rounded-xl border-2 border-slate-300 bg-white px-3 py-2.5 outline-none
-                        focus:border-indigo-500 focus:ring-4 focus:ring-indigo-200"
-                 placeholder="/home/www-virtual/licenseacademy.jp" />
-          <p class="mt-1 text-xs text-slate-500">Fixer はこのパス配下の .php/.tpl を編集します（ブランチで実行推奨）</p>
-        </div>
-
-        <details class="rounded-xl border border-slate-200 p-4">
-          <summary class="cursor-pointer text-sm text-slate-700">Optional ログイン (loginid/password/send)</summary>
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-5 mt-3">
+        <details class="group rounded-xl border border-dashed border-slate-300 bg-slate-50/60 p-4">
+          <summary class="cursor-pointer text-sm text-slate-700 flex items-center gap-2">
+            Optional Login Configuration (custom field names supported)
+          </summary>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-3">
             <div>
-              <label class="block text-sm font-medium text-slate-700">ログイン URL</label>
-              <input id="login_url" type="text"
-                     class="mt-1 w-full rounded-xl border-2 border-slate-300 bg-white px-3 py-2.5 outline-none
-                            focus:border-indigo-500 focus:ring-4 focus:ring-indigo-200"
-                     placeholder="http://localhost:8186/c-actors/admin/login">
+              <label class="block text-sm font-medium text-slate-700">Login URL</label>
+              <input id="login_url" type="text" class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 shadow-xs"
+                     placeholder="http://localhost:8186/admin/login">
             </div>
             <div>
-              <label class="block text-sm font-medium text-slate-700">ユーザー名・ID</label>
-              <input id="login_id" type="text"
-                     class="mt-1 w-full rounded-xl border-2 border-slate-300 bg-white px-3 py-2.5 outline-none
-                            focus:border-indigo-500 focus:ring-4 focus:ring-indigo-200"
-                     placeholder="super">
+              <label class="block text-sm font-medium text-slate-700">Username Field</label>
+              <input id="login_id_name" type="text" class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 shadow-xs"
+                     placeholder="Field name (e.g. loginid)">
+              <input id="login_id" type="text" class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 shadow-xs"
+                     placeholder="Username value">
             </div>
             <div>
-              <label class="block text-sm font-medium text-slate-700">パスワード</label>
-              <input id="login_pw" type="password"
-                     class="mt-1 w-full rounded-xl border-2 border-slate-300 bg-white px-3 py-2.5 outline-none
-                            focus:border-indigo-500 focus:ring-4 focus:ring-indigo-200"
-                     placeholder="******">
+              <label class="block text-sm font-medium text-slate-700">Password Field</label>
+              <input id="login_pw_name" type="text" class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 shadow-xs"
+                     placeholder="Field name (e.g. password)">
+              <input id="login_pw" type="password" class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 shadow-xs"
+                     placeholder="Password value">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-slate-700">Submit Button</label>
+              <input id="login_submit_name" type="text" class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 shadow-xs"
+                     placeholder="Button name (e.g. submit)">
             </div>
           </div>
         </details>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-          <div>
-            <label class="block text-sm font-medium text-slate-700">endpoint Excel (xlsx; sheet has <code>url</code> column)</label>
-            <input id="excel_file" name="excel_file" type="file" accept=".xlsx"
-                   class="mt-1 block w-full text-sm text-slate-700 border-2 border-dashed border-slate-300 rounded-xl p-3"/>
+          <div class="group">
+            <label class="block text-sm font-medium text-slate-700">Upload Endpoint URLs (Excel)</label>
+            <div class="mt-1 flex items-center gap-3 rounded-xl border border-slate-300 bg-white px-3 py-2.5 shadow-xs">
+              <input id="excel_file" name="excel_file" type="file" accept=".xlsx" class="text-sm text-slate-700">
+              <span class="text-xs text-slate-500">* Requires <code>url</code> column</span>
+            </div>
           </div>
-          <div>
-            <label class="block text-sm font-medium text-slate-700">endpoint を手で追加 (1行=1URL; 相対OK)</label>
+          <div class="group">
+            <label class="block text-sm font-medium text-slate-700">Manual Endpoint Entry (one URL per line)</label>
             <textarea id="endpoints_text" rows="6"
-                      class="mt-1 w-full rounded-xl border-2 border-slate-300 bg-white px-3 py-2.5 outline-none
+                      class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 shadow-xs outline-none placeholder-slate-400
                              focus:border-indigo-500 focus:ring-4 focus:ring-indigo-200"
-                      placeholder="/, /c-actors/cast/index, ..."></textarea>
+                      placeholder="/admin/dashboard&#10;/api/users&#10;/reports/summary"></textarea>
           </div>
         </div>
 
-        <div class="flex items-center gap-3 pt-1">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div class="group">
+            <label class="block text-sm font-medium text-slate-700">PHP Project Root (optional for auto-fix)</label>
+            <input id="project_root" type="text"
+                   class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 shadow-xs"
+                   placeholder="/path/to/your/php/project">
+          </div>
+          <div class="group flex items-end">
+            <label class="inline-flex items-center gap-2">
+              <input id="auto_fix" type="checkbox" class="h-4 w-4 rounded border-slate-300">
+              <span class="text-sm text-slate-700">Enable Auto-Fix (AI + Pattern Rules)</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-3 pt-1">
           <button id="runBtn"
-                  class="px-4 py-2.5 rounded-xl bg-indigo-600 text-white font-medium shadow
-                         hover:bg-indigo-700 active:bg-indigo-800">
-            テストを実行する
+                  class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 text-white font-medium shadow-sm
+                         hover:bg-indigo-700 active:bg-indigo-800 focus:outline-none focus:ring-4 focus:ring-indigo-200">
+            Run Tests
           </button>
-          <span id="jobInfo" class="text-sm text-slate-600 hidden">Job: <code id="jobId"></code></span>
-          <a id="downloadLink" href="#" class="ml-auto text-indigo-700 underline hidden">Excelレポートダウンロード</a>
+          <span id="jobInfo" class="text-sm text-slate-600 hidden">
+            Job: <code id="jobId" class="px-2 py-0.5 bg-slate-100 border border-slate-200 rounded-md"></code>
+          </span>
+          <a id="downloadLink" href="#"
+             class="ml-auto inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 text-white font-medium shadow-sm
+                    hover:bg-emerald-700 active:bg-emerald-800 focus:outline-none focus:ring-4 focus:ring-emerald-200 hidden">
+            Download Excel Report
+          </a>
         </div>
 
         <div id="progressWrap" class="mt-4 hidden">
           <div class="flex justify-between text-sm mb-1">
-            <span>Progress</span>
-            <span id="progressLabel">0 / 0</span>
+            <span class="text-slate-600">Progress</span>
+            <span id="progressLabel" class="font-medium">0 / 0</span>
           </div>
-          <div class="w-full bg-slate-200 rounded h-3">
-            <div id="progressBar" class="bg-indigo-600 h-3 rounded" style="width:0%"></div>
+          <div class="w-full h-3 rounded-full bg-slate-200 overflow-hidden">
+            <div id="progressBar" class="h-3 bg-gradient-to-r from-teal-500 to-teal-600 rounded-full transition-all duration-300" style="width:0%"></div>
           </div>
         </div>
 
         <div id="summaryWrap" class="mt-6 grid grid-cols-1 md:grid-cols-3 gap-6 hidden">
-          <div class="bg-white rounded-xl border border-slate-200 p-4">
-            <div class="text-sm text-slate-600">Totals</div>
-            <div class="text-3xl font-semibold"><span id="passedCount">0</span> passed / <span id="failedCount">0</span> failed</div>
+          <div class="bg-white border border-slate-200 rounded-2xl shadow-sm p-4">
+            <div class="text-sm text-slate-600">Test Results</div>
+            <div class="mt-1 text-3xl font-semibold">
+              <span id="passedCount" class="text-emerald-600">0</span>
+              <span class="text-slate-400"> passed / </span>
+              <span id="failedCount" class="text-rose-600">0</span>
+              <span class="text-slate-400"> failed</span>
+            </div>
           </div>
-          <div class="bg-white rounded-xl border border-slate-200 p-4">
+          <div class="bg-white border border-slate-200 rounded-2xl shadow-sm p-4">
             <div class="text-sm text-slate-600 mb-2">Pass vs Fail</div>
             <div class="chart-box"><canvas id="pfChart"></canvas></div>
           </div>
-          <div class="bg-white rounded-xl border border-slate-200 p-4">
-            <div class="text-sm text-slate-600 mb-2">Top Errors</div>
+          <div class="bg-white border border-slate-200 rounded-2xl shadow-sm p-4">
+            <div class="text-sm text-slate-600 mb-2" id="errTitle">Top Errors</div>
             <div class="chart-box"><canvas id="errChart"></canvas></div>
           </div>
         </div>
+
+        <!-- Fix candidates panel -->
+        <div id="fixPanel" class="mt-6 hidden">
+          <div class="bg-white border border-slate-200 rounded-2xl shadow-sm p-4">
+            <div class="flex items-center gap-2">
+              <div class="text-sm text-slate-600">Fix Candidates</div>
+              <span id="fixCount" class="text-xs px-2 py-0.5 bg-slate-100 rounded border border-slate-200">0 files</span>
+              <div class="ml-auto flex items-center gap-2">
+                <label class="text-xs text-slate-600">Dynamic Properties:</label>
+                <select id="dynMode" class="text-xs border rounded px-2 py-1">
+                  <option value="off" selected>Off</option>
+                  <option value="declare">Declare Properties</option>
+                </select>
+                <button id="applyFixBtn"
+                        class="px-3 py-2 rounded-xl bg-rose-600 text-white text-sm font-medium shadow-sm hover:bg-rose-700 disabled:opacity-50"
+                        disabled onclick="applyFix()">
+                  Apply Selected Fixes
+                </button>
+              </div>
+            </div>
+            <div class="mt-3 overflow-auto border-t border-slate-100">
+              <table class="min-w-full text-sm">
+                <thead>
+                  <tr class="text-left text-slate-600">
+                    <th class="py-2 pr-3">
+                      <input id="selAll" type="checkbox" onclick="toggleAllTargets(this)">
+                    </th>
+                    <th class="py-2 pr-3">File</th>
+                    <th class="py-2 pr-3">Lines</th>
+                    <th class="py-2">Error Count</th>
+                  </tr>
+                </thead>
+                <tbody id="fixBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <!-- /Fix candidates panel -->
+
       </form>
     </div>
 
-    <p class="mt-3 text-xs text-slate-500">* Excel には <code>url</code> 列が必要です。生成レポートにはスクリーンショットが埋め込まれます。</p>
-  </div>
+    <p class="mt-3 text-xs text-slate-500">
+      * Excel files must contain a <code>url</code> column. Generated reports include embedded screenshots for visual verification.
+    </p>
+  </main>
 
 <script>
 let pollTimer = null, pfChart = null, errChart = null;
+let lastJobId = null;
+let currentTargets = [];
 
-function safeDestroyCharts(){
-  try { if (pfChart) { pfChart.destroy(); pfChart = null; } } catch(e){}
-  try { if (errChart) { errChart.destroy(); errChart = null; } } catch(e){}
+async function refreshAiStatus() {
+  const badge = document.getElementById("aiStatus");
+  try {
+    const r = await fetch("/ai/health");
+    const j = await r.json();
+    if (j.ok) {
+      badge.className = "ml-auto inline-flex items-center gap-2 px-2.5 py-1 rounded-full border text-xs border-emerald-300 text-emerald-700 bg-emerald-50";
+      badge.innerHTML = `<span class="inline-block w-2 h-2 rounded-full bg-emerald-500"></span> AI: ready (${j.model}, ${j.latency_ms}ms)`;
+      return true;
+    } else {
+      badge.className = "ml-auto inline-flex items-center gap-2 px-2.5 py-1 rounded-full border text-xs border-rose-300 text-rose-700 bg-rose-50";
+      badge.innerHTML = `<span class="inline-block w-2 h-2 rounded-full bg-rose-500"></span> AI: error`;
+      return false;
+    }
+  } catch (e) {
+    badge.className = "ml-auto inline-flex items-center gap-2 px-2.5 py-1 rounded-full border text-xs border-rose-300 text-rose-700 bg-rose-50";
+    badge.innerHTML = `<span class="inline-block w-2 h-2 rounded-full bg-rose-500"></span> AI: error`;
+    return false;
+  }
 }
 
-function startRun() {
+document.addEventListener("DOMContentLoaded", refreshAiStatus);
+
+function safeDestroyCharts() {
+  try { pfChart && pfChart.destroy(); } catch(e) {}
+  pfChart = null;
+  try { errChart && errChart.destroy(); } catch(e) {}
+  errChart = null;
+}
+
+async function startRun() {
+  await refreshAiStatus();
   const fd = new FormData();
   if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
   safeDestroyCharts();
 
   fd.append("base_url", document.getElementById("base_url").value.trim());
   fd.append("test_type", document.getElementById("test_type").value);
-  fd.append("project_root", document.getElementById("project_root").value.trim());
   fd.append("login_url", document.getElementById("login_url").value.trim());
   fd.append("login_id", document.getElementById("login_id").value.trim());
+  fd.append("login_id_name", document.getElementById("login_id_name").value.trim());
   fd.append("login_pw", document.getElementById("login_pw").value);
+  fd.append("login_pw_name", document.getElementById("login_pw_name").value);
+  fd.append("login_submit_name", document.getElementById("login_submit_name").value);
   fd.append("endpoints_text", document.getElementById("endpoints_text").value);
+  fd.append("project_root", document.getElementById("project_root").value.trim());
+  fd.append("auto_fix", document.getElementById("auto_fix").checked ? "1" : "0");
 
   const f = document.getElementById("excel_file");
   if (f.files && f.files[0]) fd.append("excel_file", f.files[0]);
@@ -156,21 +273,23 @@ function startRun() {
   document.getElementById("downloadLink").classList.add("hidden");
   document.getElementById("summaryWrap").classList.add("hidden");
   document.getElementById("progressWrap").classList.remove("hidden");
+  renderTargets([]);
 
-  fetch("/run-test", { method: "POST", body: fd })
-    .then(r => r.json())
-    .then(j => {
-      if (!j.ok) throw new Error(j.error || "failed");
-      const jobId = j.job_id;
-      document.getElementById("jobInfo").classList.remove("hidden");
-      document.getElementById("jobId").innerText = jobId;
-      poll(jobId);
-    })
-    .catch(err => {
-      alert(err.message);
-      document.getElementById("runBtn").disabled = false;
-      document.getElementById("progressWrap").classList.add("hidden");
-    });
+  try {
+    const r = await fetch("/run-test", { method: "POST", body: fd });
+    const j = await r.json();
+    if (!j.ok) throw new Error(j.error || "Test execution failed");
+    
+    const jobId = j.job_id;
+    lastJobId = jobId;
+    document.getElementById("jobInfo").classList.remove("hidden");
+    document.getElementById("jobId").innerText = jobId;
+    poll(jobId);
+  } catch (err) {
+    alert(err.message || String(err));
+    document.getElementById("runBtn").disabled = false;
+    document.getElementById("progressWrap").classList.add("hidden");
+  }
 }
 
 function poll(jobId) {
@@ -181,8 +300,7 @@ function poll(jobId) {
     if (!j.ok) return;
 
     const job = j.job || {};
-    const total = job.total || 0;
-    const progress = job.progress || 0;
+    const total = job.total || 0, progress = job.progress || 0;
     document.getElementById("progressLabel").innerText = `${progress} / ${total}`;
     const pc = total ? Math.round((progress / total) * 100) : 0;
     document.getElementById("progressBar").style.width = pc + "%";
@@ -192,27 +310,32 @@ function poll(jobId) {
     document.getElementById("passedCount").innerText = passed;
     document.getElementById("failedCount").innerText = failed;
 
-    updateCharts(passed, failed, job.errors || {});
+    updateCharts(passed, failed, job.errors || {}, job.errors_by_file || {});
 
     if (job.status === "done") {
       clearInterval(pollTimer);
       document.getElementById("runBtn").disabled = false;
-      document.getElementById("downloadLink").classList.remove("hidden");
-      document.getElementById("downloadLink").href = job.download_url;
+      const dl = document.getElementById("downloadLink");
+      if (job.download_url) {
+        dl.classList.remove("hidden");
+        dl.href = job.download_url;
+      }
       document.getElementById("summaryWrap").classList.remove("hidden");
+      fetchTargets(jobId);
     }
     if (job.status === "error") {
       clearInterval(pollTimer);
       document.getElementById("runBtn").disabled = false;
-      alert("Job failed: " + (job.error_msg || "unknown error"));
+      alert("Test execution failed: " + (job.error_msg || "Unknown error occurred"));
     }
   }, 1000);
 }
 
-function updateCharts(passed, failed, errors) {
+function updateCharts(passed, failed, errorsByType, errorsByFile) {
   const pfData = [passed, failed];
-  const errLabels = Object.keys(errors).slice(0, 5);
-  const errCounts = errLabels.map(k => errors[k]);
+  const source = (errorsByFile && Object.keys(errorsByFile).length) ? errorsByFile : (errorsByType || {});
+  const errLabels = Object.keys(source).slice(0, 5);
+  const errCounts = errLabels.map(k => source[k]);
 
   const pfCtx = document.getElementById("pfChart").getContext("2d");
   const errCtx = document.getElementById("errChart").getContext("2d");
@@ -221,23 +344,125 @@ function updateCharts(passed, failed, errors) {
     pfChart = new Chart(pfCtx, {
       type: "doughnut",
       data: { labels: ["Passed", "Failed"], datasets: [{ data: pfData }] },
-      options: { responsive: true, maintainAspectRatio: false }
+      options: { responsive: true, maintainAspectRatio: false, animation: false, devicePixelRatio: 1 }
     });
   } else {
     pfChart.data.datasets[0].data = pfData;
-    pfChart.update();
+    pfChart.update("none");
+  }
+
+  const titleEl = document.getElementById("errTitle");
+  if (titleEl) {
+    titleEl.textContent = (source === errorsByFile) ? "Top Errors (by File)" : "Top Errors";
   }
 
   if (!errChart) {
     errChart = new Chart(errCtx, {
       type: "bar",
       data: { labels: errLabels, datasets: [{ data: errCounts }] },
-      options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, scales: { x: { beginAtZero: true } } }
+      options: {
+        indexAxis: 'y', responsive: true, maintainAspectRatio: false, animation: false, devicePixelRatio: 1,
+        scales: { x: { beginAtZero: true } }
+      }
     });
   } else {
     errChart.data.labels = errLabels;
     errChart.data.datasets[0].data = errCounts;
-    errChart.update();
+    errChart.update("none");
+  }
+}
+
+// ------- Fix candidates UI -------
+function renderTargets(targets) {
+  currentTargets = targets || [];
+  const panel = document.getElementById("fixPanel");
+  const body = document.getElementById("fixBody");
+  const count = document.getElementById("fixCount");
+  const btn = document.getElementById("applyFixBtn");
+  const selAll = document.getElementById("selAll");
+
+  if (!panel || !body || !count || !btn) return;
+
+  body.innerHTML = "";
+  for (const t of currentTargets) {
+    const tr = document.createElement("tr");
+    tr.className = "border-b border-slate-100";
+    tr.innerHTML = `
+      <td class="py-2 pr-3 align-top">
+        <input class="selTarget" type="checkbox" data-file="${t.file}">
+      </td>
+      <td class="py-2 pr-3 align-top font-mono text-[12px] break-all">
+        ${t.file}${t.exists ? "" : ' <span class="text-rose-600">(file not found)</span>'}
+      </td>
+      <td class="py-2 pr-3 align-top">${(t.lines || []).join(", ")}</td>
+      <td class="py-2 align-top">${t.count || 0}</td>
+    `;
+    body.appendChild(tr);
+  }
+
+  count.textContent = `${currentTargets.length} files`;
+  btn.disabled = currentTargets.length === 0;
+  panel.classList.toggle("hidden", currentTargets.length === 0);
+  if (selAll) selAll.checked = false;
+}
+
+function toggleAllTargets(cb) {
+  for (const el of document.querySelectorAll(".selTarget")) el.checked = cb.checked;
+}
+
+async function fetchTargets(jobId) {
+  try {
+    const r = await fetch(`/job/${jobId}/targets`);
+    const j = await r.json();
+    if (j.ok) {
+      renderTargets(j.targets || []);
+    } else {
+      renderTargets([]);
+    }
+  } catch {
+    renderTargets([]);
+  }
+}
+
+async function applyFix() {
+  if (!lastJobId) return;
+
+  const selected = Array.from(document.querySelectorAll(".selTarget"))
+    .filter(x => x.checked)
+    .map(x => ({
+      file: x.dataset.file,
+      lines: (currentTargets.find(t => t.file === x.dataset.file)?.lines || [])
+    }));
+
+  if (selected.length === 0) {
+    alert("Please select at least one file to fix.");
+    return;
+  }
+
+  const dyn = document.getElementById("dynMode").value || "off";
+  if (!confirm(`Apply fixes to ${selected.length} file(s)? (Dynamic properties: ${dyn})`)) return;
+
+  try {
+    const r = await fetch(`/job/${lastJobId}/fix`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        items: selected,
+        options: { dynprops: dyn }
+      })
+    });
+
+    const j = await r.json();
+    if (!j.ok) {
+      alert(j.error || "Fix operation failed");
+      return;
+    }
+
+    console.log("Fix results:", j.results);
+    alert("Fixes applied successfully. Check the console for details.");
+    fetchTargets(lastJobId);
+  } catch (e) {
+    alert("Fix request failed: " + e.message);
   }
 }
 </script>

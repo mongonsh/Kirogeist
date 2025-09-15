@@ -1,436 +1,661 @@
-<!doctype html>
-<html lang="ja">
-<head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>Magic Migration</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <style>
-    .chart-box { position: relative; height: 220px; }
-    .chart-box > canvas { width: 100% !important; height: 100% !important; display: block; }
-  </style>
-</head>
-<body class="bg-slate-50 text-slate-800">
-  <header class="border-b bg-white/80 backdrop-blur">
-    <div class="max-w-6xl mx-auto px-6 py-4 flex items-center gap-3">
-      <div class="w-9 h-9 rounded-xl bg-indigo-600 text-white grid place-items-center shadow-sm">P</div>
-      <h1 class="text-xl md:text-2xl font-semibold tracking-tight">PHP8テストMigration</h1>
-      <span id="aiStatus"
-            class="ml-auto inline-flex items-center gap-2 px-2.5 py-1 rounded-full border text-xs
-                   border-slate-300 text-slate-600 bg-slate-50">
-        <span class="inline-block w-2 h-2 rounded-full bg-slate-300"></span>
-        AI: checking…
-      </span>
-    </div>
-  </header>
-
-  <main class="max-w-6xl mx-auto p-6">
-    <div class="bg-white border border-slate-200 rounded-2xl shadow-sm">
-      <div class="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
-        <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 7h18M3 12h18M3 17h18"/></svg>
-        <span class="font-medium">テスト設定</span>
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Kirogeist - PHP Testing & Migration Assistant</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+      .chart-box {
+        position: relative;
+        height: 220px;
+      }
+      .chart-box > canvas {
+        width: 100% !important;
+        height: 100% !important;
+        display: block;
+      }
+    </style>
+  </head>
+  <body class="bg-slate-50 text-slate-800">
+    <header class="border-b bg-white/80 backdrop-blur">
+      <div class="max-w-6xl mx-auto px-6 py-4 flex items-center gap-3">
+        <div
+          class="w-9 h-9 rounded-xl bg-indigo-600 text-white grid place-items-center shadow-sm"
+        >
+          P
+        </div>
+        <h1 class="text-xl md:text-2xl font-semibold tracking-tight">
+          Kirogeist
+        </h1>
+        <span
+          id="aiStatus"
+          class="ml-auto inline-flex items-center gap-2 px-2.5 py-1 rounded-full border text-xs border-slate-300 text-slate-600 bg-slate-50"
+        >
+          <span class="inline-block w-2 h-2 rounded-full bg-slate-300"></span>
+          AI: checking…
+        </span>
       </div>
+    </header>
 
-      <form id="testForm" class="p-5 space-y-6" onsubmit="event.preventDefault(); startRun();">
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-          <div class="group">
-            <label class="block text-sm font-medium text-slate-700">Base URL</label>
-            <input id="base_url" type="text"
-                   class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 shadow-xs outline-none placeholder-slate-400
-                          focus:border-indigo-500 focus:ring-4 focus:ring-indigo-200"
-                   placeholder="http://localhost:8186" value="http://localhost:8186"/>
-            <p class="mt-1 text-xs text-slate-500">サイトのルートURL</p>
-          </div>
-
-          <div class="group">
-            <label class="block text-sm font-medium text-slate-700">テスト種類</label>
-            <select id="test_type"
-                    class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 shadow-xs outline-none
-                           focus:border-indigo-500 focus:ring-4 focus:ring-indigo-200">
-              <option value="smoke" selected>スモークテスト (default)</option>
-              <option value="e2e">E2Eテスト</option>
-              <option value="integration">integrationテスト</option>
-            </select>
-          </div>
+    <main class="max-w-6xl mx-auto p-6">
+      <div class="bg-white border border-slate-200 rounded-2xl shadow-sm">
+        <div
+          class="px-5 py-4 border-b border-slate-100 flex items-center gap-2"
+        >
+          <svg
+            class="w-5 h-5 text-indigo-600"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M3 7h18M3 12h18M3 17h18"
+            />
+          </svg>
+          <span class="font-medium">Settings</span>
         </div>
 
-        <details class="group rounded-xl border border-dashed border-slate-300 bg-slate-50/60 p-4">
-          <summary class="cursor-pointer text-sm text-slate-700 flex items-center gap-2">
-            Optional ログイン (custom name attrs OK)
-          </summary>
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-3">
-            <div>
-              <label class="block text-sm font-medium text-slate-700">ログイン URL</label>
-              <input id="login_url" type="text" class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 shadow-xs"
-                     placeholder="http://localhost:8186/c-actors/admin/login">
+        <form
+          id="testForm"
+          class="p-5 space-y-6"
+          onsubmit="event.preventDefault(); startRun();"
+        >
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div class="group">
+              <label class="block text-sm font-medium text-slate-700"
+                >Base URL</label
+              >
+              <input
+                id="base_url"
+                type="text"
+                class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 shadow-xs outline-none placeholder-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-200"
+                placeholder="http://localhost:8186"
+                value="http://localhost:8186"
+              />
+              <p class="mt-1 text-xs text-slate-500">Site URL</p>
             </div>
-            <div>
-              <label class="block text-sm font-medium text-slate-700">ユーザー名・ID</label>
-              <input id="login_id_name" type="text" class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 shadow-xs"
-                     placeholder="input name (e.g. loginid)">
-              <input id="login_id" type="text" class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 shadow-xs"
-                     placeholder="super">
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-slate-700">パスワード</label>
-              <input id="login_pw_name" type="text" class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 shadow-xs"
-                     placeholder="input name (e.g. password)">
-              <input id="login_pw" type="password" class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 shadow-xs"
-                     placeholder="******">
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-slate-700">Submit</label>
-              <input id="login_submit_name" type="text" class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 shadow-xs"
-                     placeholder="button name (e.g. send)">
-            </div>
-          </div>
-        </details>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-          <div class="group">
-            <label class="block text-sm font-medium text-slate-700">EndpointのURLをアップロード (xlsx)</label>
-            <div class="mt-1 flex items-center gap-3 rounded-xl border border-slate-300 bg-white px-3 py-2.5 shadow-xs">
-              <input id="excel_file" name="excel_file" type="file" accept=".xlsx" class="text-sm text-slate-700">
-              <span class="text-xs text-slate-500">* シートに <code>url</code> 列が必要</span>
-            </div>
-          </div>
-          <div class="group">
-            <label class="block text-sm font-medium text-slate-700">Endpointを手動で追加 (1行=1URL)</label>
-            <textarea id="endpoints_text" rows="6"
-                      class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 shadow-xs outline-none placeholder-slate-400
-                             focus:border-indigo-500 focus:ring-4 focus:ring-indigo-200"
-                      placeholder="/c-actors/admin/ ..."></textarea>
-          </div>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-          <div class="group">
-            <label class="block text-sm font-medium text-slate-700">PHP Project Root (optional for fixer)</label>
-            <input id="project_root" type="text"
-                   class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 shadow-xs"
-                   placeholder="/path/to/project">
-          </div>
-          <div class="group flex items-end">
-            <label class="inline-flex items-center gap-2">
-              <input id="auto_fix" type="checkbox" class="h-4 w-4 rounded border-slate-300">
-              <span class="text-sm text-slate-700">Auto Fix (AI+rules)</span>
-            </label>
-          </div>
-        </div>
-
-        <div class="flex flex-wrap items-center gap-3 pt-1">
-          <button id="runBtn"
-                  class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 text-white font-medium shadow-sm
-                         hover:bg-indigo-700 active:bg-indigo-800 focus:outline-none focus:ring-4 focus:ring-indigo-200">
-            テストを実行する
-          </button>
-
-          <span id="jobInfo" class="text-sm text-slate-600 hidden">
-            Job: <code id="jobId" class="px-2 py-0.5 bg-slate-100 border border-slate-200 rounded-md"></code>
-          </span>
-
-          <a id="downloadLink" href="#"
-             class="ml-auto inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 text-white font-medium shadow-sm
-                    hover:bg-emerald-700 active:bg-emerald-800 focus:outline-none focus:ring-4 focus:ring-emerald-200 hidden">
-            Excelレポートダウンロード
-          </a>
-        </div>
-
-        <div id="progressWrap" class="mt-4 hidden">
-          <div class="flex justify-between text-sm mb-1">
-            <span class="text-slate-600">プログレス</span>
-            <span id="progressLabel" class="font-medium">0 / 0</span>
-          </div>
-          <div class="w-full h-3 rounded-full bg-slate-200 overflow-hidden">
-            <div id="progressBar" class="h-3 bg-gradient-to-r from-teal-500 to-teal-600 rounded-full transition-all duration-300" style="width:0%"></div>
-          </div>
-        </div>
-
-        <div id="summaryWrap" class="mt-6 grid grid-cols-1 md:grid-cols-3 gap-6 hidden">
-          <div class="bg-white border border-slate-200 rounded-2xl shadow-sm p-4">
-            <div class="text-sm text-slate-600">Totals</div>
-            <div class="mt-1 text-3xl font-semibold">
-              <span id="passedCount" class="text-emerald-600">0</span>
-              <span class="text-slate-400"> テスト成功 / </span>
-              <span id="failedCount" class="text-rose-600">0</span>
-              <span class="text-slate-400"> テスト失敗</span>
+            <div class="group">
+              <label class="block text-sm font-medium text-slate-700"
+                >test type</label
+              >
+              <select
+                id="test_type"
+                class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 shadow-xs outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-200"
+              >
+                <option value="smoke" selected>Smoke test (default)</option>
+                <option value="e2e">E2E test</option>
+                <option value="integration">integration test</option>
+              </select>
             </div>
           </div>
 
-          <div class="bg-white border border-slate-200 rounded-2xl shadow-sm p-4">
-            <div class="text-sm text-slate-600 mb-2">Pass vs Fail</div>
-            <div class="chart-box"><canvas id="pfChart"></canvas></div>
-          </div>
-
-          <div class="bg-white border border-slate-200 rounded-2xl shadow-sm p-4">
-            <div class="text-sm text-slate-600 mb-2" id="errTitle">トップエラー</div>
-            <div class="chart-box"><canvas id="errChart"></canvas></div>
-          </div>
-        </div>
-
-        <!-- Fix candidates panel -->
-        <div id="fixPanel" class="mt-6 hidden">
-          <div class="bg-white border border-slate-200 rounded-2xl shadow-sm p-4">
-            <div class="flex items-center gap-2">
-              <div class="text-sm text-slate-600">Fix candidates</div>
-              <span id="fixCount" class="text-xs px-2 py-0.5 bg-slate-100 rounded border border-slate-200">0 files</span>
-              <div class="ml-auto flex items-center gap-2">
-                <label class="text-xs text-slate-600">Dynamic props:</label>
-                <select id="dynMode" class="text-xs border rounded px-2 py-1">
-                  <option value="off" selected>off</option>
-                  <option value="declare">declare props</option>
-                </select>
-                <button id="applyFixBtn"
-                  class="px-3 py-2 rounded-xl bg-rose-600 text-white text-sm font-medium shadow-sm hover:bg-rose-700 disabled:opacity-50"
-                  disabled onclick="applyFix()">
-                  Fix Selected
-                </button>
+          <details
+            class="group rounded-xl border border-dashed border-slate-300 bg-slate-50/60 p-4"
+          >
+            <summary
+              class="cursor-pointer text-sm text-slate-700 flex items-center gap-2"
+            >
+              Optional Login (custom name attrs OK)
+            </summary>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-3">
+              <div>
+                <label class="block text-sm font-medium text-slate-700"
+                  >Login URL</label
+                >
+                <input
+                  id="login_url"
+                  type="text"
+                  class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 shadow-xs"
+                  placeholder="http://localhost:8186/c-actors/admin/login"
+                />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-slate-700"
+                  >User・ID</label
+                >
+                <input
+                  id="login_id_name"
+                  type="text"
+                  class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 shadow-xs"
+                  placeholder="input name (e.g. loginid)"
+                />
+                <input
+                  id="login_id"
+                  type="text"
+                  class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 shadow-xs"
+                  placeholder="super"
+                />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-slate-700"
+                  >Password</label
+                >
+                <input
+                  id="login_pw_name"
+                  type="text"
+                  class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 shadow-xs"
+                  placeholder="input name (e.g. password)"
+                />
+                <input
+                  id="login_pw"
+                  type="password"
+                  class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 shadow-xs"
+                  placeholder="******"
+                />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-slate-700"
+                  >Submit</label
+                >
+                <input
+                  id="login_submit_name"
+                  type="text"
+                  class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 shadow-xs"
+                  placeholder="button name (e.g. send)"
+                />
               </div>
             </div>
-            <div class="mt-3 overflow-auto border-t border-slate-100">
-              <table class="min-w-full text-sm">
-                <thead>
-                  <tr class="text-left text-slate-600">
-                    <th class="py-2 pr-3"><input id="selAll" type="checkbox" onclick="toggleAllTargets(this)"></th>
-                    <th class="py-2 pr-3">File</th>
-                    <th class="py-2 pr-3">Lines</th>
-                    <th class="py-2">Hits</th>
-                  </tr>
-                </thead>
-                <tbody id="fixBody"></tbody>
-              </table>
+          </details>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div class="group">
+              <label class="block text-sm font-medium text-slate-700"
+                >EndpointのURLをアップロード (xlsx)</label
+              >
+              <div
+                class="mt-1 flex items-center gap-3 rounded-xl border border-slate-300 bg-white px-3 py-2.5 shadow-xs"
+              >
+                <input
+                  id="excel_file"
+                  name="excel_file"
+                  type="file"
+                  accept=".xlsx"
+                  class="text-sm text-slate-700"
+                />
+                <span class="text-xs text-slate-500"
+                  >* There must be <code>url</code> in sheet</span
+                >
+              </div>
+            </div>
+            <div class="group">
+              <label class="block text-sm font-medium text-slate-700"
+                >Endpoints (1row=1URL)</label
+              >
+              <textarea
+                id="endpoints_text"
+                rows="6"
+                class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 shadow-xs outline-none placeholder-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-200"
+                placeholder="/c-actors/admin/ ..."
+              ></textarea>
             </div>
           </div>
-        </div>
-        <!-- /Fix candidates panel -->
-      </form>
-    </div>
 
-    <p class="mt-3 text-xs text-slate-500">
-      * Excel には <code>url</code> 列が必要です。生成されたレポートにスクリーンショットが埋め込まれます。
-    </p>
-  </main>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div class="group">
+              <label class="block text-sm font-medium text-slate-700"
+                >PHP Project Root (optional for fixer)</label
+              >
+              <input
+                id="project_root"
+                type="text"
+                class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 shadow-xs"
+                placeholder="/path/to/project"
+              />
+            </div>
+            <div class="group flex items-end">
+              <label class="inline-flex items-center gap-2">
+                <input
+                  id="auto_fix"
+                  type="checkbox"
+                  class="h-4 w-4 rounded border-slate-300"
+                />
+                <span class="text-sm text-slate-700">Auto Fix (AI+rules)</span>
+              </label>
+            </div>
+          </div>
 
-<script>
-let pollTimer=null, pfChart=null, errChart=null;
-let lastJobId=null;
-let currentTargets=[];
+          <div class="flex flex-wrap items-center gap-3 pt-1">
+            <button
+              id="runBtn"
+              class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 text-white font-medium shadow-sm hover:bg-indigo-700 active:bg-indigo-800 focus:outline-none focus:ring-4 focus:ring-indigo-200"
+            >
+              テストを実行する
+            </button>
 
-async function refreshAiStatus(){
-  const badge=document.getElementById("aiStatus");
-  try{
-    const r=await fetch("/ai/health"); const j=await r.json();
-    if(j.ok){
-      badge.className="ml-auto inline-flex items-center gap-2 px-2.5 py-1 rounded-full border text-xs border-emerald-300 text-emerald-700 bg-emerald-50";
-      badge.innerHTML=`<span class="inline-block w-2 h-2 rounded-full bg-emerald-500"></span> AI: ready (${j.model}, ${j.latency_ms}ms)`;
-      return true;
-    }else{
-      badge.className="ml-auto inline-flex items-center gap-2 px-2.5 py-1 rounded-full border text-xs border-rose-300 text-rose-700 bg-rose-50";
-      badge.innerHTML=`<span class="inline-block w-2 h-2 rounded-full bg-rose-500"></span> AI: error`;
-      return false;
-    }
-  }catch(e){
-    badge.className="ml-auto inline-flex items-center gap-2 px-2.5 py-1 rounded-full border text-xs border-rose-300 text-rose-700 bg-rose-50";
-    badge.innerHTML=`<span class="inline-block w-2 h-2 rounded-full bg-rose-500"></span> AI: error`;
-    return false;
-  }
-}
-document.addEventListener("DOMContentLoaded", refreshAiStatus);
+            <span id="jobInfo" class="text-sm text-slate-600 hidden">
+              Job:
+              <code
+                id="jobId"
+                class="px-2 py-0.5 bg-slate-100 border border-slate-200 rounded-md"
+              ></code>
+            </span>
 
-function safeDestroyCharts(){ try{pfChart&&pfChart.destroy();}catch(e){} pfChart=null; try{errChart&&errChart.destroy();}catch(e){} errChart=null; }
+            <a
+              id="downloadLink"
+              href="#"
+              class="ml-auto inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 text-white font-medium shadow-sm hover:bg-emerald-700 active:bg-emerald-800 focus:outline-none focus:ring-4 focus:ring-emerald-200 hidden"
+            >
+              Excelレポートダウンロード
+            </a>
+          </div>
 
-async function startRun(){
-  await refreshAiStatus();
-  const fd=new FormData();
-  if (pollTimer){ clearInterval(pollTimer); pollTimer=null; }
-  safeDestroyCharts();
-  fd.append("base_url", document.getElementById("base_url").value.trim());
-  fd.append("test_type", document.getElementById("test_type").value);
-  fd.append("login_url", document.getElementById("login_url").value.trim());
-  fd.append("login_id", document.getElementById("login_id").value.trim());
-  fd.append("login_id_name", document.getElementById("login_id_name").value.trim());
-  fd.append("login_pw", document.getElementById("login_pw").value);
-  fd.append("login_pw_name", document.getElementById("login_pw_name").value);
-  fd.append("login_submit_name", document.getElementById("login_submit_name").value);
-  fd.append("endpoints_text", document.getElementById("endpoints_text").value);
-  fd.append("project_root", document.getElementById("project_root").value.trim());
-  fd.append("auto_fix", document.getElementById("auto_fix").checked ? "1" : "0");
-  const f=document.getElementById("excel_file"); if (f.files && f.files[0]) fd.append("excel_file", f.files[0]);
+          <div id="progressWrap" class="mt-4 hidden">
+            <div class="flex justify-between text-sm mb-1">
+              <span class="text-slate-600">プログレス</span>
+              <span id="progressLabel" class="font-medium">0 / 0</span>
+            </div>
+            <div class="w-full h-3 rounded-full bg-slate-200 overflow-hidden">
+              <div
+                id="progressBar"
+                class="h-3 bg-gradient-to-r from-teal-500 to-teal-600 rounded-full transition-all duration-300"
+                style="width: 0%"
+              ></div>
+            </div>
+          </div>
 
-  document.getElementById("runBtn").disabled=true;
-  document.getElementById("downloadLink").classList.add("hidden");
-  document.getElementById("summaryWrap").classList.add("hidden");
-  document.getElementById("progressWrap").classList.remove("hidden");
+          <div
+            id="summaryWrap"
+            class="mt-6 grid grid-cols-1 md:grid-cols-3 gap-6 hidden"
+          >
+            <div
+              class="bg-white border border-slate-200 rounded-2xl shadow-sm p-4"
+            >
+              <div class="text-sm text-slate-600">Totals</div>
+              <div class="mt-1 text-3xl font-semibold">
+                <span id="passedCount" class="text-emerald-600">0</span>
+                <span class="text-slate-400"> Success / </span>
+                <span id="failedCount" class="text-rose-600">0</span>
+                <span class="text-slate-400"> Failed</span>
+              </div>
+            </div>
 
-  renderTargets([]);
+            <div
+              class="bg-white border border-slate-200 rounded-2xl shadow-sm p-4"
+            >
+              <div class="text-sm text-slate-600 mb-2">Pass vs Fail</div>
+              <div class="chart-box"><canvas id="pfChart"></canvas></div>
+            </div>
 
-  try{
-    const r=await fetch("/run-test",{method:"POST", body:fd});
-    const j=await r.json();
-    if(!j.ok) throw new Error(j.error||"failed");
-    const jobId=j.job_id;
-    lastJobId=jobId;
-    document.getElementById("jobInfo").classList.remove("hidden");
-    document.getElementById("jobId").innerText=jobId;
-    poll(jobId);
-  }catch(err){
-    alert(err.message||String(err));
-    document.getElementById("runBtn").disabled=false;
-    document.getElementById("progressWrap").classList.add("hidden");
-  }
-}
+            <div
+              class="bg-white border border-slate-200 rounded-2xl shadow-sm p-4"
+            >
+              <div class="text-sm text-slate-600 mb-2" id="errTitle">
+                トップエラー
+              </div>
+              <div class="chart-box"><canvas id="errChart"></canvas></div>
+            </div>
+          </div>
 
-function poll(jobId){
-  if (pollTimer) clearInterval(pollTimer);
-  pollTimer=setInterval(async ()=>{
-    const r=await fetch(`/job/${jobId}/status`);
-    const j=await r.json();
-    if(!j.ok) return;
-    const job=j.job||{};
+          <!-- Fix candidates panel -->
+          <div id="fixPanel" class="mt-6 hidden">
+            <div
+              class="bg-white border border-slate-200 rounded-2xl shadow-sm p-4"
+            >
+              <div class="flex items-center gap-2">
+                <div class="text-sm text-slate-600">Fix candidates</div>
+                <span
+                  id="fixCount"
+                  class="text-xs px-2 py-0.5 bg-slate-100 rounded border border-slate-200"
+                  >0 files</span
+                >
+                <div class="ml-auto flex items-center gap-2">
+                  <label class="text-xs text-slate-600">Dynamic props:</label>
+                  <select id="dynMode" class="text-xs border rounded px-2 py-1">
+                    <option value="off" selected>off</option>
+                    <option value="declare">declare props</option>
+                  </select>
+                  <button
+                    id="applyFixBtn"
+                    class="px-3 py-2 rounded-xl bg-rose-600 text-white text-sm font-medium shadow-sm hover:bg-rose-700 disabled:opacity-50"
+                    disabled
+                    onclick="applyFix()"
+                  >
+                    Fix Selected
+                  </button>
+                </div>
+              </div>
+              <div class="mt-3 overflow-auto border-t border-slate-100">
+                <table class="min-w-full text-sm">
+                  <thead>
+                    <tr class="text-left text-slate-600">
+                      <th class="py-2 pr-3">
+                        <input
+                          id="selAll"
+                          type="checkbox"
+                          onclick="toggleAllTargets(this)"
+                        />
+                      </th>
+                      <th class="py-2 pr-3">File</th>
+                      <th class="py-2 pr-3">Lines</th>
+                      <th class="py-2">Hits</th>
+                    </tr>
+                  </thead>
+                  <tbody id="fixBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          <!-- /Fix candidates panel -->
+        </form>
+      </div>
+    </main>
 
-    const total=job.total||0, progress=job.progress||0;
-    document.getElementById("progressLabel").innerText=`${progress} / ${total}`;
-    const pc= total ? Math.round((progress/total)*100) : 0;
-    document.getElementById("progressBar").style.width=pc+"%";
+    <script>
+      let pollTimer = null,
+        pfChart = null,
+        errChart = null;
+      let lastJobId = null;
+      let currentTargets = [];
 
-    const passed=(job.summary&&job.summary.passed)||0;
-    const failed=(job.summary&&job.summary.failed)||0;
-    document.getElementById("passedCount").innerText=passed;
-    document.getElementById("failedCount").innerText=failed;
-    updateCharts(passed, failed, job.errors || {}, job.errors_by_file || {});
+      async function refreshAiStatus() {
+        const badge = document.getElementById("aiStatus");
+        try {
+          const r = await fetch("/ai/health");
+          const j = await r.json();
+          if (j.ok) {
+            badge.className =
+              "ml-auto inline-flex items-center gap-2 px-2.5 py-1 rounded-full border text-xs border-emerald-300 text-emerald-700 bg-emerald-50";
+            badge.innerHTML = `<span class="inline-block w-2 h-2 rounded-full bg-emerald-500"></span> AI: ready (${j.model}, ${j.latency_ms}ms)`;
+            return true;
+          } else {
+            badge.className =
+              "ml-auto inline-flex items-center gap-2 px-2.5 py-1 rounded-full border text-xs border-rose-300 text-rose-700 bg-rose-50";
+            badge.innerHTML = `<span class="inline-block w-2 h-2 rounded-full bg-rose-500"></span> AI: error`;
+            return false;
+          }
+        } catch (e) {
+          badge.className =
+            "ml-auto inline-flex items-center gap-2 px-2.5 py-1 rounded-full border text-xs border-rose-300 text-rose-700 bg-rose-50";
+          badge.innerHTML = `<span class="inline-block w-2 h-2 rounded-full bg-rose-500"></span> AI: error`;
+          return false;
+        }
+      }
+      document.addEventListener("DOMContentLoaded", refreshAiStatus);
 
-    if(job.status==="done"){
-      clearInterval(pollTimer);
-      document.getElementById("runBtn").disabled=false;
-      const dl=document.getElementById("downloadLink");
-      if (job.download_url){ dl.classList.remove("hidden"); dl.href=job.download_url; }
-      document.getElementById("summaryWrap").classList.remove("hidden");
-      fetchTargets(jobId);
-    }
-    if(job.status==="error"){
-      clearInterval(pollTimer);
-      document.getElementById("runBtn").disabled=false;
-      alert("Job failed: "+(job.error_msg||"unknown error"));
-    }
-  }, 1000);
-}
+      function safeDestroyCharts() {
+        try {
+          pfChart && pfChart.destroy();
+        } catch (e) {}
+        pfChart = null;
+        try {
+          errChart && errChart.destroy();
+        } catch (e) {}
+        errChart = null;
+      }
 
-function updateCharts(passed, failed, errorsByType, errorsByFile){
-  const pfData=[passed, failed];
+      async function startRun() {
+        await refreshAiStatus();
+        const fd = new FormData();
+        if (pollTimer) {
+          clearInterval(pollTimer);
+          pollTimer = null;
+        }
+        safeDestroyCharts();
+        fd.append("base_url", document.getElementById("base_url").value.trim());
+        fd.append("test_type", document.getElementById("test_type").value);
+        fd.append(
+          "login_url",
+          document.getElementById("login_url").value.trim()
+        );
+        fd.append("login_id", document.getElementById("login_id").value.trim());
+        fd.append(
+          "login_id_name",
+          document.getElementById("login_id_name").value.trim()
+        );
+        fd.append("login_pw", document.getElementById("login_pw").value);
+        fd.append(
+          "login_pw_name",
+          document.getElementById("login_pw_name").value
+        );
+        fd.append(
+          "login_submit_name",
+          document.getElementById("login_submit_name").value
+        );
+        fd.append(
+          "endpoints_text",
+          document.getElementById("endpoints_text").value
+        );
+        fd.append(
+          "project_root",
+          document.getElementById("project_root").value.trim()
+        );
+        fd.append(
+          "auto_fix",
+          document.getElementById("auto_fix").checked ? "1" : "0"
+        );
+        const f = document.getElementById("excel_file");
+        if (f.files && f.files[0]) fd.append("excel_file", f.files[0]);
 
-  const source = (errorsByFile && Object.keys(errorsByFile).length)
-    ? errorsByFile
-    : (errorsByType || {});
-  const errLabels=Object.keys(source).slice(0,5);
-  const errCounts=errLabels.map(k=>source[k]);
+        document.getElementById("runBtn").disabled = true;
+        document.getElementById("downloadLink").classList.add("hidden");
+        document.getElementById("summaryWrap").classList.add("hidden");
+        document.getElementById("progressWrap").classList.remove("hidden");
 
-  const pfCtx=document.getElementById("pfChart").getContext("2d");
-  const errCtx=document.getElementById("errChart").getContext("2d");
+        renderTargets([]);
 
-  if(!pfChart){
-    pfChart=new Chart(pfCtx,{
-      type:"doughnut",
-      data:{labels:["Passed","Failed"],datasets:[{data:pfData}]},
-      options:{responsive:true,maintainAspectRatio:false,animation:false,devicePixelRatio:1}
-    });
-  }else{
-    pfChart.data.datasets[0].data=pfData; pfChart.update("none");
-  }
+        try {
+          const r = await fetch("/run-test", { method: "POST", body: fd });
+          const j = await r.json();
+          if (!j.ok) throw new Error(j.error || "failed");
+          const jobId = j.job_id;
+          lastJobId = jobId;
+          document.getElementById("jobInfo").classList.remove("hidden");
+          document.getElementById("jobId").innerText = jobId;
+          poll(jobId);
+        } catch (err) {
+          alert(err.message || String(err));
+          document.getElementById("runBtn").disabled = false;
+          document.getElementById("progressWrap").classList.add("hidden");
+        }
+      }
 
-  const titleEl = document.getElementById("errTitle");
-  if (titleEl){
-    titleEl.textContent = (source === errorsByFile) ? "トップエラー（ファイル別）" : "トップエラー";
-  }
+      function poll(jobId) {
+        if (pollTimer) clearInterval(pollTimer);
+        pollTimer = setInterval(async () => {
+          const r = await fetch(`/job/${jobId}/status`);
+          const j = await r.json();
+          if (!j.ok) return;
+          const job = j.job || {};
 
-  if(!errChart){
-    errChart=new Chart(errCtx,{
-      type:"bar",
-      data:{labels:errLabels,datasets:[{data:errCounts}]},
-      options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,animation:false,devicePixelRatio:1,scales:{x:{beginAtZero:true}}}
-    });
-  }else{
-    errChart.data.labels=errLabels; errChart.data.datasets[0].data=errCounts; errChart.update("none");
-  }
-}
+          const total = job.total || 0,
+            progress = job.progress || 0;
+          document.getElementById(
+            "progressLabel"
+          ).innerText = `${progress} / ${total}`;
+          const pc = total ? Math.round((progress / total) * 100) : 0;
+          document.getElementById("progressBar").style.width = pc + "%";
 
-// ------- Fix candidates UI -------
-function renderTargets(targets){
-  currentTargets = targets || [];
-  const panel = document.getElementById("fixPanel");
-  const body = document.getElementById("fixBody");
-  const count = document.getElementById("fixCount");
-  const btn = document.getElementById("applyFixBtn");
-  const selAll = document.getElementById("selAll");
+          const passed = (job.summary && job.summary.passed) || 0;
+          const failed = (job.summary && job.summary.failed) || 0;
+          document.getElementById("passedCount").innerText = passed;
+          document.getElementById("failedCount").innerText = failed;
+          updateCharts(
+            passed,
+            failed,
+            job.errors || {},
+            job.errors_by_file || {}
+          );
 
-  if (!panel || !body || !count || !btn) return;
+          if (job.status === "done") {
+            clearInterval(pollTimer);
+            document.getElementById("runBtn").disabled = false;
+            const dl = document.getElementById("downloadLink");
+            if (job.download_url) {
+              dl.classList.remove("hidden");
+              dl.href = job.download_url;
+            }
+            document.getElementById("summaryWrap").classList.remove("hidden");
+            fetchTargets(jobId);
+          }
+          if (job.status === "error") {
+            clearInterval(pollTimer);
+            document.getElementById("runBtn").disabled = false;
+            alert("Job failed: " + (job.error_msg || "unknown error"));
+          }
+        }, 1000);
+      }
 
-  body.innerHTML = "";
-  for (const t of currentTargets){
-    const tr = document.createElement("tr");
-    tr.className = "border-b border-slate-100";
-    tr.innerHTML = `
-      <td class="py-2 pr-3 align-top"><input class="selTarget" type="checkbox" data-file="${t.file}"></td>
-      <td class="py-2 pr-3 align-top font-mono text-[12px] break-all">${t.file}${t.exists ? "" : ' <span class="text-rose-600">(missing)</span>'}</td>
-      <td class="py-2 pr-3 align-top">${(t.lines||[]).join(", ")}</td>
-      <td class="py-2 align-top">${t.count||0}</td>
+      function updateCharts(passed, failed, errorsByType, errorsByFile) {
+        const pfData = [passed, failed];
+
+        const source =
+          errorsByFile && Object.keys(errorsByFile).length
+            ? errorsByFile
+            : errorsByType || {};
+        const errLabels = Object.keys(source).slice(0, 5);
+        const errCounts = errLabels.map((k) => source[k]);
+
+        const pfCtx = document.getElementById("pfChart").getContext("2d");
+        const errCtx = document.getElementById("errChart").getContext("2d");
+
+        if (!pfChart) {
+          pfChart = new Chart(pfCtx, {
+            type: "doughnut",
+            data: {
+              labels: ["Passed", "Failed"],
+              datasets: [{ data: pfData }],
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              animation: false,
+              devicePixelRatio: 1,
+            },
+          });
+        } else {
+          pfChart.data.datasets[0].data = pfData;
+          pfChart.update("none");
+        }
+
+        const titleEl = document.getElementById("errTitle");
+        if (titleEl) {
+          titleEl.textContent =
+            source === errorsByFile
+              ? "トップエラー（ファイル別）"
+              : "トップエラー";
+        }
+
+        if (!errChart) {
+          errChart = new Chart(errCtx, {
+            type: "bar",
+            data: { labels: errLabels, datasets: [{ data: errCounts }] },
+            options: {
+              indexAxis: "y",
+              responsive: true,
+              maintainAspectRatio: false,
+              animation: false,
+              devicePixelRatio: 1,
+              scales: { x: { beginAtZero: true } },
+            },
+          });
+        } else {
+          errChart.data.labels = errLabels;
+          errChart.data.datasets[0].data = errCounts;
+          errChart.update("none");
+        }
+      }
+
+      // ------- Fix candidates UI -------
+      function renderTargets(targets) {
+        currentTargets = targets || [];
+        const panel = document.getElementById("fixPanel");
+        const body = document.getElementById("fixBody");
+        const count = document.getElementById("fixCount");
+        const btn = document.getElementById("applyFixBtn");
+        const selAll = document.getElementById("selAll");
+
+        if (!panel || !body || !count || !btn) return;
+
+        body.innerHTML = "";
+        for (const t of currentTargets) {
+          const tr = document.createElement("tr");
+          tr.className = "border-b border-slate-100";
+          tr.innerHTML = `
+      <td class="py-2 pr-3 align-top"><input class="selTarget" type="checkbox" data-file="${
+        t.file
+      }"></td>
+      <td class="py-2 pr-3 align-top font-mono text-[12px] break-all">${
+        t.file
+      }${t.exists ? "" : ' <span class="text-rose-600">(missing)</span>'}</td>
+      <td class="py-2 pr-3 align-top">${(t.lines || []).join(", ")}</td>
+      <td class="py-2 align-top">${t.count || 0}</td>
     `;
-    body.appendChild(tr);
-  }
-  count.textContent = `${currentTargets.length} files`;
-  btn.disabled = currentTargets.length === 0;
-  panel.classList.toggle("hidden", currentTargets.length === 0);
-  if (selAll) selAll.checked = false;
-}
+          body.appendChild(tr);
+        }
+        count.textContent = `${currentTargets.length} files`;
+        btn.disabled = currentTargets.length === 0;
+        panel.classList.toggle("hidden", currentTargets.length === 0);
+        if (selAll) selAll.checked = false;
+      }
 
-function toggleAllTargets(cb){
-  for (const el of document.querySelectorAll(".selTarget")) el.checked = cb.checked;
-}
+      function toggleAllTargets(cb) {
+        for (const el of document.querySelectorAll(".selTarget"))
+          el.checked = cb.checked;
+      }
 
-async function fetchTargets(jobId){
-  try{
-    const r = await fetch(`/job/${jobId}/targets`);
-    const j = await r.json();
-    if(j.ok){
-      renderTargets(j.targets || []);
-    }else{
-      renderTargets([]);
-    }
-  }catch{
-    renderTargets([]);
-  }
-}
+      async function fetchTargets(jobId) {
+        try {
+          const r = await fetch(`/job/${jobId}/targets`);
+          const j = await r.json();
+          if (j.ok) {
+            renderTargets(j.targets || []);
+          } else {
+            renderTargets([]);
+          }
+        } catch {
+          renderTargets([]);
+        }
+      }
 
-async function applyFix(){
-  if (!lastJobId) return;
-  const selected = Array.from(document.querySelectorAll(".selTarget"))
-    .filter(x => x.checked)
-    .map(x => ({ file: x.dataset.file, lines: (currentTargets.find(t=>t.file===x.dataset.file)?.lines || []) }));
-  if (selected.length === 0){
-    alert("Select at least one file.");
-    return;
-  }
-  const dyn = document.getElementById("dynMode").value || "off";
-  if (!confirm(`Apply fixes to ${selected.length} file(s)? (dynprops: ${dyn})`)) return;
+      async function applyFix() {
+        if (!lastJobId) return;
+        const selected = Array.from(document.querySelectorAll(".selTarget"))
+          .filter((x) => x.checked)
+          .map((x) => ({
+            file: x.dataset.file,
+            lines:
+              currentTargets.find((t) => t.file === x.dataset.file)?.lines ||
+              [],
+          }));
+        if (selected.length === 0) {
+          alert("Select at least one file.");
+          return;
+        }
+        const dyn = document.getElementById("dynMode").value || "off";
+        if (
+          !confirm(
+            `Apply fixes to ${selected.length} file(s)? (dynprops: ${dyn})`
+          )
+        )
+          return;
 
-  try{
-    const r = await fetch(`/job/${lastJobId}/fix`, {
-      method: "POST",
-      headers: {"Content-Type":"application/json"},
-      body: JSON.stringify({ items: selected, options: { dynprops: dyn } })
-    });
-    const j = await r.json();
-    if (!j.ok){
-      alert(j.error || "Fix failed");
-      return;
-    }
-    console.log("Fix results:", j.results);
-    alert("Fix applied.");
-    fetchTargets(lastJobId);
-  }catch(e){
-    alert("Fix request error");
-  }
-}
-</script>
-</body>
+        try {
+          const r = await fetch(`/job/${lastJobId}/fix`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              items: selected,
+              options: { dynprops: dyn },
+            }),
+          });
+          const j = await r.json();
+          if (!j.ok) {
+            alert(j.error || "Fix failed");
+            return;
+          }
+          console.log("Fix results:", j.results);
+          alert("Fix applied.");
+          fetchTargets(lastJobId);
+        } catch (e) {
+          alert("Fix request error");
+        }
+      }
+    </script>
+  </body>
 </html>
