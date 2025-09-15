@@ -1,0 +1,34 @@
+{
+  "name": "Update Error Patterns",
+  "description": "Automatically update error patterns when patterns.yaml is modified to improve error detection",
+  "trigger": {
+    "type": "file_save",
+    "patterns": ["patterns.yaml", "**/*patterns*.yaml"]
+  },
+  "conditions": [
+    {
+      "type": "file_exists",
+      "path": "fixer.py"
+    }
+  ],
+  "actions": [
+    {
+      "type": "run_command",
+      "command": "python",
+      "args": [
+        "-c",
+        "import yaml; import json; from fixer import load_rules; rules = load_rules(); print(f'Loaded {len(rules)} error pattern rules'); print(json.dumps([{'id': r['id'], 'note': r.get('note', '')} for r in rules[:5]], indent=2))"
+      ],
+      "working_directory": "."
+    },
+    {
+      "type": "create_file",
+      "path": "logs/pattern-updates.log",
+      "content": "{{timestamp}}: Error patterns updated from {{file_path}}\n",
+      "append": true
+    }
+  ],
+  "settings": {
+    "debounce_ms": 2000
+  }
+}

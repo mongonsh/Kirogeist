@@ -1,0 +1,37 @@
+{
+  "name": "Pre-commit Smoke Test",
+  "description": "Run quick smoke tests before commits to prevent broken code from being committed",
+  "trigger": {
+    "type": "manual",
+    "button_text": "🧪 Pre-commit Test"
+  },
+  "conditions": [
+    {
+      "type": "git_status",
+      "has_changes": true
+    },
+    {
+      "type": "file_exists",
+      "path": "app.py"
+    }
+  ],
+  "actions": [
+    {
+      "type": "run_command",
+      "command": "python",
+      "args": [
+        "-c",
+        "import requests; import os; import time; base_url = os.environ.get('KIROGEIST_BASE_URL', 'http://localhost:5051'); project_root = os.getcwd(); critical_endpoints = ['/', '/admin/login']; print('Starting pre-commit smoke test...'); response = requests.post(f'{base_url}/run-test', data={'base_url': os.environ.get('TEST_TARGET_URL', 'http://localhost:8186'), 'test_type': 'smoke', 'project_root': project_root, 'endpoints_text': '\\n'.join(critical_endpoints)}); job_id = response.json().get('job_id'); print(f'Test job started: {job_id}'); time.sleep(10); status_response = requests.get(f'{base_url}/job/{job_id}/status'); status = status_response.json(); print(f'Test status: {status.get(\"job\", {}).get(\"status\", \"unknown\")}'); summary = status.get('job', {}).get('summary', {}); print(f'Results: {summary.get(\"passed\", 0)} passed, {summary.get(\"failed\", 0)} failed')"
+      ],
+      "working_directory": "."
+    },
+    {
+      "type": "show_notification",
+      "message": "Pre-commit smoke test completed. Check results before committing.",
+      "type": "info"
+    }
+  ],
+  "settings": {
+    "timeout_ms": 120000
+  }
+}

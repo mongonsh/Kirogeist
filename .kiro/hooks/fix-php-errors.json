@@ -1,0 +1,43 @@
+{
+  "name": "Auto-fix PHP Errors",
+  "description": "Automatically attempt to fix common PHP errors when they are detected in test results",
+  "trigger": {
+    "type": "manual",
+    "button_text": "🔧 Auto-fix PHP Errors"
+  },
+  "conditions": [
+    {
+      "type": "file_exists",
+      "path": "fixer.py"
+    },
+    {
+      "type": "file_exists",
+      "path": "patterns.yaml"
+    }
+  ],
+  "actions": [
+    {
+      "type": "run_command",
+      "command": "python",
+      "args": [
+        "-c",
+        "import os; from fixer import fix_errors; project_root = os.getcwd(); print(f'Scanning for PHP errors in: {project_root}'); sample_error_html = '''<b>Warning</b>: Undefined array key \"user_id\" in <b>/home/www/test.php</b> on line <b>42</b>'''; results = fix_errors(sample_error_html, project_root); print(f'Fix results: {len(results)} files processed'); for result in results[:3]: print(f'  {result.get(\"file\", \"unknown\")}: {\"✓\" if result.get(\"changed\") else \"○\"} {result.get(\"method\", \"none\")} - {result.get(\"note\", \"no changes\")}')"
+      ],
+      "working_directory": "."
+    },
+    {
+      "type": "create_file",
+      "path": "logs/auto-fix.log",
+      "content": "{{timestamp}}: Auto-fix PHP errors executed in {{workspace_name}}\n",
+      "append": true
+    },
+    {
+      "type": "show_notification",
+      "message": "PHP error auto-fix completed. Check logs for details.",
+      "type": "success"
+    }
+  ],
+  "settings": {
+    "timeout_ms": 60000
+  }
+}

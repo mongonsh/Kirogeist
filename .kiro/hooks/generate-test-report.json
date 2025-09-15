@@ -1,0 +1,33 @@
+{
+  "name": "Generate Test Report",
+  "description": "Generate comprehensive test reports with screenshots and error analysis",
+  "trigger": {
+    "type": "manual",
+    "button_text": "📊 Generate Test Report"
+  },
+  "conditions": [
+    {
+      "type": "file_exists",
+      "path": "app.py"
+    }
+  ],
+  "actions": [
+    {
+      "type": "run_command",
+      "command": "python",
+      "args": [
+        "-c",
+        "import requests; import os; import time; from datetime import datetime; base_url = os.environ.get('KIROGEIST_BASE_URL', 'http://localhost:5051'); project_root = os.getcwd(); endpoints_file = 'test-endpoints.txt'; endpoints = []; if os.path.exists(endpoints_file): with open(endpoints_file, 'r') as f: endpoints = [line.strip() for line in f if line.strip()]; else: endpoints = ['/', '/admin', '/login', '/dashboard', '/api/health']; print(f'Running comprehensive test on {len(endpoints)} endpoints...'); response = requests.post(f'{base_url}/run-test', data={'base_url': os.environ.get('TEST_TARGET_URL', 'http://localhost:8186'), 'test_type': 'smoke', 'project_root': project_root, 'endpoints_text': '\\n'.join(endpoints)}); job_id = response.json().get('job_id'); print(f'Test job ID: {job_id}'); print('Waiting for test completion...'); while True: time.sleep(5); status_response = requests.get(f'{base_url}/job/{job_id}/status'); status_data = status_response.json(); job_status = status_data.get('job', {}).get('status'); if job_status == 'done': print('✓ Test completed successfully'); download_url = status_data.get('job', {}).get('download_url'); if download_url: print(f'Report available at: {base_url}{download_url}'); break; elif job_status == 'error': print('✗ Test failed'); break; else: progress = status_data.get('job', {}).get('progress', 0); total = status_data.get('job', {}).get('total', 0); print(f'Progress: {progress}/{total}')"
+      ],
+      "working_directory": "."
+    },
+    {
+      "type": "create_file",
+      "path": "reports/test-report-{{timestamp}}.log",
+      "content": "Test report generated at {{timestamp}}\nProject: {{workspace_name}}\nEndpoints tested: See kirogeist output above\n"
+    }
+  ],
+  "settings": {
+    "timeout_ms": 600000
+  }
+}

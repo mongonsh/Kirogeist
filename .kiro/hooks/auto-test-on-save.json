@@ -1,0 +1,30 @@
+{
+  "name": "Auto Test on PHP File Save",
+  "description": "Automatically run smoke tests when PHP files are saved to catch errors early",
+  "trigger": {
+    "type": "file_save",
+    "patterns": ["**/*.php", "**/*.tpl", "**/*.phtml"]
+  },
+  "conditions": [
+    {
+      "type": "file_exists",
+      "path": "app.py"
+    },
+    {
+      "type": "env_var_exists",
+      "name": "KIROGEIST_AUTO_TEST"
+    }
+  ],
+  "actions": [
+    {
+      "type": "run_command",
+      "command": "python",
+      "args": ["-c", "import requests; import os; base_url = os.environ.get('KIROGEIST_BASE_URL', 'http://localhost:5051'); project_root = os.getcwd(); requests.post(f'{base_url}/run-test', data={'base_url': os.environ.get('TEST_TARGET_URL', 'http://localhost:8186'), 'test_type': 'smoke', 'project_root': project_root, 'endpoints_text': '/'})"],
+      "working_directory": "."
+    }
+  ],
+  "settings": {
+    "debounce_ms": 5000,
+    "max_concurrent": 1
+  }
+}

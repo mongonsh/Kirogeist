@@ -1,0 +1,35 @@
+{
+  "name": "Daily Smoke Test Report",
+  "description": "Run comprehensive smoke tests daily and generate reports for quality monitoring",
+  "trigger": {
+    "type": "schedule",
+    "cron": "0 9 * * *"
+  },
+  "conditions": [
+    {
+      "type": "file_exists",
+      "path": "app.py"
+    }
+  ],
+  "actions": [
+    {
+      "type": "run_command",
+      "command": "python",
+      "args": [
+        "-c",
+        "import requests; import json; import os; from datetime import datetime; base_url = os.environ.get('KIROGEIST_BASE_URL', 'http://localhost:5051'); project_root = os.getcwd(); endpoints = ['/', '/admin', '/login', '/dashboard']; response = requests.post(f'{base_url}/run-test', data={'base_url': os.environ.get('TEST_TARGET_URL', 'http://localhost:8186'), 'test_type': 'smoke', 'project_root': project_root, 'endpoints_text': '\\n'.join(endpoints)}); print(f'Daily smoke test started: {response.json()}')"
+      ],
+      "working_directory": "."
+    },
+    {
+      "type": "create_file",
+      "path": "reports/daily-test-log.txt",
+      "content": "Daily smoke test executed at {{timestamp}}\nProject: {{workspace_name}}\nStatus: Initiated\n",
+      "append": true
+    }
+  ],
+  "settings": {
+    "timeout_ms": 300000,
+    "retry_count": 2
+  }
+}
