@@ -4,7 +4,7 @@ from urllib.parse import urljoin, urlsplit, urldefrag, parse_qsl, urlencode, url
 
 warnings.filterwarnings("ignore")
 
-from flask import Flask, request, jsonify, send_file, render_template
+from flask import Flask, request, jsonify, send_file, render_template, abort, make_response
 import pandas as pd
 import requests
 from PIL import Image
@@ -148,7 +148,7 @@ def remap_host_path(path_in: str) -> str:
             return os.path.normpath(remapped)
     return os.path.normpath(path_in)
 
-# ------------------------ Japanese-grid writer ------------------------
+# ------------------------ Excel writer ------------------------
 def write_with_images_fit(
     df: pd.DataFrame,
     out_path: str,
@@ -263,7 +263,7 @@ def write_with_images_fit(
             row_idx += 1
 
 # ------------------------ Selenium bits ------------------------
-def make_driver(headless: bool = False):
+def make_driver(headless: bool = True):
     opts = Options()
     opts.add_argument("--no-sandbox")
     opts.add_argument("--disable-dev-shm-usage")
@@ -339,6 +339,8 @@ def run_test_job(
             "project_root": project_root,
             "needs_confirmation": False,
             "targets": {},
+            "current_url": None,     # <-- for iframe preview
+            "last_shot": None,       # <-- for screenshot fallback
         })
 
     driver = None
@@ -363,6 +365,10 @@ def run_test_job(
 
         for idx, raw in enumerate(endpoints, start=1):
             url = normalize_url(raw, base_url, keep_query=True)
+
+            with JOBS_LOCK:
+                JOBS[job_id]["current_url"] = url
+
             status_code, ctype, body = http_status(sess, url)
 
             driver.get(url)
@@ -370,6 +376,9 @@ def run_test_job(
                 wait.until(EC.presence_of_element_located((By.TAG_NAME, "body")))
             except Exception:
                 pass
+            finally:
+                with JOBS_LOCK:
+                    JOBS[job_id]["current_url"] = url
 
             title = (driver.title or "").strip()
             if not title:
@@ -420,6 +429,8 @@ def run_test_job(
 
             shot_path = url_to_shot(job_id, url)
             fullpage_screenshot(driver, shot_path)
+            with JOBS_LOCK:
+                JOBS[job_id]["last_shot"] = shot_path
 
             status = "PASSED" if not note else "FAILED"
             if status == "PASSED":
@@ -462,7 +473,8 @@ def run_test_job(
 # ------------------------ Routes ------------------------
 @app.route("/", methods=["GET"])
 def index():
-    return render_template("index.html")
+    # IMPORTANT: use the filename you actually have
+    return render_template("index_v1.html")
 
 @app.route('/ai/health', methods=['GET'])
 def health_check():
@@ -507,8 +519,10 @@ def run_test():
 
     if not base_url:
         return jsonify({"ok": False, "error": "base_url is required"}), 400
+
+    # default to "/" if user didn’t provide endpoints
     if not normed:
-        return jsonify({"ok": False, "error": "No endpoints provided"}), 400
+        normed = [normalize_url("/", base_url, keep_query=True)]
 
     job_id = uuid.uuid4().hex[:12]
     with JOBS_LOCK:
@@ -536,7 +550,12 @@ def job_status(job_id):
         return jsonify({"ok": False, "error": "job not found"}), 404
 
     resp = dict(data)
-    resp.pop("targets", None)  # remove set-heavy structure from status payload
+    # add handy URL for the last shot so the front-end can just set img.src
+    if data.get("last_shot"):
+        resp["last_shot_url"] = f"/job/{job_id}/last-shot"
+
+    # don't dump the heavy set objects directly
+    resp.pop("targets", None)
 
     def _safe(o):
         if isinstance(o, set):
@@ -585,7 +604,7 @@ def job_fix(job_id):
     items = data.get("items") or []   # [{file, lines:[...] }]
     options = data.get("options") or {}  # e.g., {"dynprops":"off|declare|attribute"}
     if not options.get("dynprops"):
-        options["dynprops"] = "declare"   
+        options["dynprops"] = "declare"
 
     with JOBS_LOCK:
         job = JOBS.get(job_id)
@@ -606,6 +625,17 @@ def job_fix(job_id):
         (job.get("fixes") or []).extend(results)
         job["needs_confirmation"] = False
     return jsonify({"ok": True, "results": results})
+
+# serve the latest screenshot (always embeddable)
+@app.route("/job/<job_id>/last-shot")
+def job_last_shot(job_id):
+    with JOBS_LOCK:
+        data = JOBS.get(job_id) or {}
+        shot = data.get("last_shot")
+    if not shot or not os.path.exists(shot):
+        abort(404)
+    # cache-bust in frontend via ?ts=Date.now()
+    return send_file(shot, mimetype="image/png")
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", "5051"))

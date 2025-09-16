@@ -1,0 +1,16 @@
+version: "3.8"
+
+services:
+  selenium:
+    image: selenium/standalone-chrome:latest   # headful in Xvfb + VNC + noVNC
+    shm_size: 2g
+    ports:
+      - "4444:4444"   # WebDriver endpoint
+      - "7900:7900"   # noVNC web UI (iframe this)
+    environment:
+      - SE_START_VNC=true
+      - SE_START_NO_VNC=true
+      - SE_VNC_NO_PASSWORD=true   # no password for demo; lock this down later
+    # optional: if you want the container to resolve host.docker.internal on linux
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
